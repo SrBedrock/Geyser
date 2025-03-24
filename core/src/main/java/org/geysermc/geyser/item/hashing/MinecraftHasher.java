@@ -28,34 +28,59 @@ package org.geysermc.geyser.item.hashing;
 import com.google.common.hash.HashCode;
 import net.kyori.adventure.key.Key;
 import org.geysermc.geyser.item.components.Rarity;
+import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.registry.JavaRegistries;
 import org.geysermc.geyser.session.cache.registry.JavaRegistryKey;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 @SuppressWarnings("UnstableApiUsage")
 @FunctionalInterface
 public interface MinecraftHasher<T> {
 
-    MinecraftHasher<Integer> INT = hasher -> hasher.number(i -> i);
+    MinecraftHasher<Byte> BYTE = hasher -> hasher.number(hasher.object());
 
-    MinecraftHasher<Key> KEY = hasher -> hasher.string(Object::toString);
+    MinecraftHasher<Short> SHORT = hasher -> hasher.number(hasher.object());
+
+    MinecraftHasher<Integer> INT = hasher -> hasher.number(hasher.object());
+
+    MinecraftHasher<Long> LONG = hasher -> hasher.number(hasher.object());
+
+    MinecraftHasher<Float> FLOAT = hasher -> hasher.number(hasher.object());
+
+    MinecraftHasher<Double> DOUBLE = hasher -> hasher.number(hasher.object());
+
+    MinecraftHasher<String> STRING = hasher -> hasher.string(hasher.object());
+
+    MinecraftHasher<Boolean> BOOL = hasher -> hasher.bool(hasher.object());
+
+    MinecraftHasher<Key> KEY = STRING.convert(Key::asString);
 
     MinecraftHasher<Integer> RARITY = fromIdEnum(Rarity.values(), Rarity::getName);
 
     MinecraftHasher<Integer> ENCHANTMENT = registry(JavaRegistries.ENCHANTMENT);
 
+    MinecraftHasher<DataComponentType<?>> DATA_COMPONENT_TYPE = KEY.convert(DataComponentType::getKey);
+
     HashCode hash(ComponentHashEncoder<T> hasher);
 
-    static <T extends Enum<T>> MinecraftHasher<Integer> fromIdEnum(T[] values, Function<T, String> toName) {
-        return hasher -> hasher.string(i -> toName.apply(values[i]));
+    default <M> MinecraftHasher<M> convert(Function<M, T> mapper) {
+        // What did I just code
+        return mappedHasher -> hash(mappedHasher.create(mapper.apply(mappedHasher.object())));
     }
 
-    static <T extends Enum<T>> MinecraftHasher<T> fromEnum(Function<T, String> toName) {
-        return hasher -> hasher.string(toName);
+    default <M> MinecraftHasher<M> sessionConvert(BiFunction<GeyserSession, M, T> mapper) {
+        // What did I just code part 2
+        return mappedHasher -> mappedHasher.useSession(session -> hash(mappedHasher.create(mapper.apply(session, mappedHasher.object()))));
+    }
+
+    static <T extends Enum<T>> MinecraftHasher<Integer> fromIdEnum(T[] values, Function<T, String> toName) {
+        return STRING.convert(id -> toName.apply(values[id]));
     }
 
     static MinecraftHasher<Integer> registry(JavaRegistryKey<?> registry) {
-        return hasher -> hasher.useSession(session -> hasher.hashValue(KEY, id -> registry.keyFromNetworkId(session, id)));
+        return KEY.sessionConvert(registry::keyFromNetworkId);
     }
 }

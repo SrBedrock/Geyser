@@ -30,8 +30,9 @@ import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.CustomModelData;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.FoodProperties;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.IntComponentType;
-import org.geysermc.mcprotocollib.protocol.data.game.item.component.ItemEnchantments;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.TooltipDisplay;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.Unit;
 
 import java.util.HashMap;
@@ -50,16 +51,39 @@ public class ComponentHashers {
         register(DataComponentTypes.DAMAGE);
         register(DataComponentTypes.UNBREAKABLE);
 
+        // TODO custom name, component
+        // TODO item name, component
+
+        register(DataComponentTypes.ITEM_MODEL, MinecraftHasher.KEY);
+
+        // TODO lore, component
+
+        register(DataComponentTypes.RARITY, MinecraftHasher.RARITY);
+        register(DataComponentTypes.ENCHANTMENTS,
+            hasher -> hasher.map(hasher.object().getEnchantments(), MinecraftHasher.ENCHANTMENT, MinecraftHasher.INT));
+
+        // TODO can place on/can break on, complicated
+        // TODO attribute modifiers, attribute registry and equipment slot group hashers
+
         registerMap(DataComponentTypes.CUSTOM_MODEL_DATA, builder -> builder
             .optionalFloats("floats", CustomModelData::floats)
             .optionalBools("flags", CustomModelData::flags)
             .optionalStrings("strings", CustomModelData::strings)
             .optionalInts("colors", CustomModelData::colors));
 
-        register(DataComponentTypes.ITEM_MODEL, MinecraftHasher.KEY);
-        register(DataComponentTypes.RARITY, MinecraftHasher.RARITY);
-        register(DataComponentTypes.ENCHANTMENTS,
-            hasher -> hasher.map(ItemEnchantments::getEnchantments, MinecraftHasher.ENCHANTMENT, MinecraftHasher.INT));
+        registerMap(DataComponentTypes.TOOLTIP_DISPLAY, builder -> builder
+            .optionalBool("hide_tooltip", TooltipDisplay::hideTooltip, false)
+            .optionalList("hidden_components", TooltipDisplay::hiddenComponents, MinecraftHasher.DATA_COMPONENT_TYPE));
+
+        register(DataComponentTypes.REPAIR_COST);
+
+        register(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, MinecraftHasher.BOOL);
+        register(DataComponentTypes.INTANGIBLE_PROJECTILE); // TODO MCPL is wrong
+
+        registerMap(DataComponentTypes.FOOD, builder -> builder
+            .acceptInt("nutrition", FoodProperties::getNutrition)
+            .acceptFloat("saturation", FoodProperties::getSaturationModifier)
+            .optionalBool("can_always_eat", FoodProperties::isCanAlwaysEat, false));
     }
 
     private static void register(DataComponentType<Unit> component) {

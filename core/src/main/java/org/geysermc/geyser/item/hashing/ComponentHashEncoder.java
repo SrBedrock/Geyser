@@ -94,12 +94,20 @@ public class ComponentHashEncoder<T> {
         trueHash = hasher.hashBytes(TRUE);
     }
 
+    public <V> ComponentHashEncoder<V> create(V value) {
+        return new ComponentHashEncoder<>(session, value);
+    }
+
+    public T object() {
+        return object;
+    }
+
     public HashCode useSession(Function<GeyserSession, HashCode> hasher) {
         return hasher.apply(session);
     }
 
-    public <V> HashCode hashValue(MinecraftHasher<V> valueHasher, Function<T, V> converter) {
-        return valueHasher.hash(new ComponentHashEncoder<>(session, converter.apply(object)));
+    public <V> HashCode hashValue(MinecraftHasher<V> valueHasher, Function<T, V> extractor) {
+        return valueHasher.hash(create(extractor.apply(object)));
     }
 
     public HashCode empty() {
@@ -154,14 +162,8 @@ public class ComponentHashEncoder<T> {
 
     public <K, V> HashCode map(Map<K, V> map, MinecraftHasher<K> keyHasher, MinecraftHasher<V> valueHasher) {
         return map(map.entrySet().stream()
-            .map(entry -> Map.entry(keyHasher.hash(new ComponentHashEncoder<>(session, entry.getKey())),
-                valueHasher.hash(new ComponentHashEncoder<>(session, entry.getValue()))))
+            .map(entry -> Map.entry(keyHasher.hash(create(entry.getKey())), valueHasher.hash(create(entry.getValue()))))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-    }
-
-    // TODO maybe remove this if enchantments updates
-    public <K, V> HashCode map(Function<T, Map<K, V>> extractor, MinecraftHasher<K> keyHasher, MinecraftHasher<V> valueHasher) {
-        return map(extractor.apply(object), keyHasher, valueHasher);
     }
 
     public HashCode map(UnaryOperator<MapBuilder<T>> builder) {
@@ -282,8 +284,8 @@ public class ComponentHashEncoder<T> {
             return this;
         }
 
-        public <V> MapBuilder<T> accept(String key, MinecraftHasher<V> valueHasher, Function<T, V> converter) {
-            return accept(key, hasher.hashValue(valueHasher, converter));
+        public <V> MapBuilder<T> accept(String key, MinecraftHasher<V> valueHasher, Function<T, V> extractor) {
+            return accept(key, hasher.hashValue(valueHasher, extractor));
         }
 
         // Not using abstract Number class here so that we can refer to these methods using the shorthand MapBuilder::accept notation
@@ -456,6 +458,14 @@ public class ComponentHashEncoder<T> {
             return optionalList(key, extractor, ListBuilder::accept);
         }
 
+        public <V> MapBuilder<T> acceptList(String key, Function<T, List<V>> extractor, MinecraftHasher<V> valueHasher) {
+            return accept(key, hasher.list(builder -> builder.accept(extractor.apply(hasher.object), valueHasher)));
+        }
+
+        public <V> MapBuilder<T> optionalList(String key, Function<T, List<V>> extractor, MinecraftHasher<V> valueHasher) {
+            return optionalList(key, extractor, (builder, value) -> builder.accept(value, valueHasher));
+        }
+
         private <V> MapBuilder<T> optionalList(String key, Function<T, List<V>> extractor, BiConsumer<ListBuilder<T>, V> acceptor) {
             List<V> list = extractor.apply(hasher.object);
             if (!list.isEmpty()) {
@@ -486,6 +496,10 @@ public class ComponentHashEncoder<T> {
         public ListBuilder<T> accept(HashCode hash) {
             list.add(hash);
             return this;
+        }
+
+        public <V> ListBuilder<T> accept(V value, MinecraftHasher<V> valueHasher) {
+            return accept(valueHasher.hash(hasher.create(value)));
         }
 
         public ListBuilder<T> accept(byte value) {
@@ -590,6 +604,11 @@ public class ComponentHashEncoder<T> {
 
         public ListBuilder<T> acceptBools(Function<T, List<Boolean>> extractor) {
             return acceptBools(extractor.apply(hasher.object));
+        }
+
+        public <V> ListBuilder<T> accept(List<V> list, MinecraftHasher<V> valueHasher) {
+            list.forEach(v -> accept(v, valueHasher));
+            return this;
         }
 
         public HashCode build() {
