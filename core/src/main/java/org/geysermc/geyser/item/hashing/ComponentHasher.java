@@ -197,7 +197,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptByte(String key, Function<T, Byte> extractor, byte defaultValue) {
+        public MapBuilder<T> optionalByte(String key, Function<T, Byte> extractor, byte defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -205,7 +205,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptShort(String key, Function<T, Short> extractor, short defaultValue) {
+        public MapBuilder<T> optionalShort(String key, Function<T, Short> extractor, short defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -213,7 +213,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptInt(String key, Function<T, Integer> extractor, int defaultValue) {
+        public MapBuilder<T> optionalInt(String key, Function<T, Integer> extractor, int defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -221,7 +221,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptLong(String key, Function<T, Long> extractor, long defaultValue) {
+        public MapBuilder<T> optionalLong(String key, Function<T, Long> extractor, long defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -229,7 +229,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptFloat(String key, Function<T, Float> extractor, float defaultValue) {
+        public MapBuilder<T> optionalFloat(String key, Function<T, Float> extractor, float defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -237,7 +237,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptDouble(String key, Function<T, Double> extractor, double defaultValue) {
+        public MapBuilder<T> optionalDouble(String key, Function<T, Double> extractor, double defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -249,7 +249,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.apply(hasher.object));
         }
 
-        public MapBuilder<T> acceptString(String key, Function<T, String> extractor, String defaultValue) {
+        public MapBuilder<T> optionalString(String key, Function<T, String> extractor, String defaultValue) {
             return optional(key, extractor, defaultValue, this::accept);
         }
 
@@ -261,7 +261,7 @@ public class ComponentHasher<T> {
             return accept(key, extractor.test(hasher.object));
         }
 
-        public MapBuilder<T> acceptBool(String key, Predicate<T> extractor, boolean defaultValue) {
+        public MapBuilder<T> optionalBool(String key, Predicate<T> extractor, boolean defaultValue) {
             return optional(key, extractor::test, defaultValue, this::accept);
         }
 
