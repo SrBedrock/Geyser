@@ -32,6 +32,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponen
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.FoodProperties;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.IntComponentType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.ItemEnchantments;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.TooltipDisplay;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.Unit;
 
@@ -59,21 +60,20 @@ public class ComponentHashers {
         // TODO lore, component
 
         register(DataComponentTypes.RARITY, MinecraftHasher.RARITY);
-        register(DataComponentTypes.ENCHANTMENTS,
-            hasher -> hasher.map(hasher.object().getEnchantments(), MinecraftHasher.ENCHANTMENT, MinecraftHasher.INT));
+        register(DataComponentTypes.ENCHANTMENTS, MinecraftHasher.map(MinecraftHasher.ENCHANTMENT, MinecraftHasher.INT).convert(ItemEnchantments::getEnchantments));
 
         // TODO can place on/can break on, complicated
         // TODO attribute modifiers, attribute registry and equipment slot group hashers
 
         registerMap(DataComponentTypes.CUSTOM_MODEL_DATA, builder -> builder
-            .optionalFloats("floats", CustomModelData::floats)
-            .optionalBools("flags", CustomModelData::flags)
-            .optionalStrings("strings", CustomModelData::strings)
-            .optionalInts("colors", CustomModelData::colors));
+            .optionalList("floats", MinecraftHasher.FLOAT, CustomModelData::floats)
+            .optionalList("flags", MinecraftHasher.BOOL, CustomModelData::flags)
+            .optionalList("strings", MinecraftHasher.STRING, CustomModelData::strings)
+            .optionalList("colors", MinecraftHasher.INT, CustomModelData::colors));
 
         registerMap(DataComponentTypes.TOOLTIP_DISPLAY, builder -> builder
-            .optionalBool("hide_tooltip", TooltipDisplay::hideTooltip, false)
-            .optionalList("hidden_components", TooltipDisplay::hiddenComponents, MinecraftHasher.DATA_COMPONENT_TYPE));
+            .optional("hide_tooltip", MinecraftHasher.BOOL, TooltipDisplay::hideTooltip, false)
+            .optionalList("hidden_components", MinecraftHasher.DATA_COMPONENT_TYPE, TooltipDisplay::hiddenComponents));
 
         register(DataComponentTypes.REPAIR_COST);
 
@@ -81,21 +81,21 @@ public class ComponentHashers {
         register(DataComponentTypes.INTANGIBLE_PROJECTILE); // TODO MCPL is wrong
 
         registerMap(DataComponentTypes.FOOD, builder -> builder
-            .acceptInt("nutrition", FoodProperties::getNutrition)
-            .acceptFloat("saturation", FoodProperties::getSaturationModifier)
-            .optionalBool("can_always_eat", FoodProperties::isCanAlwaysEat, false));
+            .accept("nutrition", MinecraftHasher.INT, FoodProperties::getNutrition)
+            .accept("saturation", MinecraftHasher.FLOAT, FoodProperties::getSaturationModifier)
+            .optional("can_always_eat", MinecraftHasher.BOOL, FoodProperties::isCanAlwaysEat, false));
     }
 
     private static void register(DataComponentType<Unit> component) {
-        register(component, ComponentHashEncoder::empty);
+        register(component, MinecraftHasher.UNIT);
     }
 
     private static void register(IntComponentType component) {
         register(component, MinecraftHasher.INT);
     }
 
-    private static <T> void registerMap(DataComponentType<T> component, UnaryOperator<ComponentHashEncoder.MapBuilder<T>> builder) {
-        register(component, hasher -> hasher.map(builder));
+    private static <T> void registerMap(DataComponentType<T> component, UnaryOperator<MapHasher<T>> builder) {
+        register(component, MinecraftHasher.mapBuilder(builder));
     }
 
     private static <T> void register(DataComponentType<T> component, MinecraftHasher<T> hasher) {
@@ -110,6 +110,6 @@ public class ComponentHashers {
         if (hasher == null) {
             throw new IllegalStateException("Unregistered hasher for component " + component + "!");
         }
-        return hasher.hash(new ComponentHashEncoder<>(session, value));
+        return hasher.hash(value, new MinecraftHashEncoder(session));
     }
 }
