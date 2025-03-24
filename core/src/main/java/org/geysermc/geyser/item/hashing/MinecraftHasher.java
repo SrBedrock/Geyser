@@ -28,6 +28,8 @@ package org.geysermc.geyser.item.hashing;
 import com.google.common.hash.HashCode;
 import net.kyori.adventure.key.Key;
 import org.geysermc.geyser.item.components.Rarity;
+import org.geysermc.geyser.session.cache.registry.JavaRegistries;
+import org.geysermc.geyser.session.cache.registry.JavaRegistryKey;
 
 import java.util.function.Function;
 
@@ -35,9 +37,13 @@ import java.util.function.Function;
 @FunctionalInterface
 public interface MinecraftHasher<T> {
 
+    MinecraftHasher<Integer> INT = hasher -> hasher.number(i -> i);
+
     MinecraftHasher<Key> KEY = hasher -> hasher.string(Object::toString);
 
     MinecraftHasher<Integer> RARITY = fromIdEnum(Rarity.values(), Rarity::getName);
+
+    MinecraftHasher<Integer> ENCHANTMENT = registry(JavaRegistries.ENCHANTMENT);
 
     HashCode hash(ComponentHashEncoder<T> hasher);
 
@@ -47,5 +53,9 @@ public interface MinecraftHasher<T> {
 
     static <T extends Enum<T>> MinecraftHasher<T> fromEnum(Function<T, String> toName) {
         return hasher -> hasher.string(toName);
+    }
+
+    static MinecraftHasher<Integer> registry(JavaRegistryKey<?> registry) {
+        return hasher -> hasher.useSession(session -> hasher.hashValue(KEY, id -> registry.keyFromNetworkId(session, id)));
     }
 }

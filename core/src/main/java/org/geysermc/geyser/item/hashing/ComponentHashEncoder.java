@@ -43,6 +43,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 // Based off the HashOps in mojmap, hashes a component, TODO: documentation
 @SuppressWarnings("UnstableApiUsage")
@@ -91,6 +92,14 @@ public class ComponentHashEncoder<T> {
         empty = hasher.hashBytes(EMPTY);
         falseHash = hasher.hashBytes(FALSE);
         trueHash = hasher.hashBytes(TRUE);
+    }
+
+    public HashCode useSession(Function<GeyserSession, HashCode> hasher) {
+        return hasher.apply(session);
+    }
+
+    public <V> HashCode hashValue(MinecraftHasher<V> valueHasher, Function<T, V> converter) {
+        return valueHasher.hash(new ComponentHashEncoder<>(session, converter.apply(object)));
     }
 
     public HashCode empty() {
@@ -143,6 +152,18 @@ public class ComponentHashEncoder<T> {
         return mapHasher.hash();
     }
 
+    public <K, V> HashCode map(Map<K, V> map, MinecraftHasher<K> keyHasher, MinecraftHasher<V> valueHasher) {
+        return map(map.entrySet().stream()
+            .map(entry -> Map.entry(keyHasher.hash(new ComponentHashEncoder<>(session, entry.getKey())),
+                valueHasher.hash(new ComponentHashEncoder<>(session, entry.getValue()))))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    // TODO maybe remove this if enchantments updates
+    public <K, V> HashCode map(Function<T, Map<K, V>> extractor, MinecraftHasher<K> keyHasher, MinecraftHasher<V> valueHasher) {
+        return map(extractor.apply(object), keyHasher, valueHasher);
+    }
+
     public HashCode map(UnaryOperator<MapBuilder<T>> builder) {
         return builder.apply(new MapBuilder<>(this)).build();
     }
@@ -166,6 +187,10 @@ public class ComponentHashEncoder<T> {
             }
         }
         return map(hashed);
+    }
+
+    public HashCode nbtMap(Function<T, NbtMap> extractor) {
+        return nbtMap(extractor.apply(object));
     }
 
     public HashCode list(List<HashCode> list) {
@@ -211,6 +236,10 @@ public class ComponentHashEncoder<T> {
         });
     }
 
+    public HashCode nbtList(Function<T, NbtList<?>> extractor) {
+        return nbtList(extractor.apply(object));
+    }
+
     public HashCode byteArray(byte[] bytes) {
         Hasher arrayHasher = hasher.newHasher();
         arrayHasher.putByte(TAG_BYTE_ARRAY_START);
@@ -253,8 +282,8 @@ public class ComponentHashEncoder<T> {
             return this;
         }
 
-        public <V> MapBuilder<T> accept(String key, MinecraftHasher<V> valueHasher, V value) {
-            return accept(key, valueHasher.hash(new ComponentHashEncoder<>(hasher.session, value)));
+        public <V> MapBuilder<T> accept(String key, MinecraftHasher<V> valueHasher, Function<T, V> converter) {
+            return accept(key, hasher.hashValue(valueHasher, converter));
         }
 
         // Not using abstract Number class here so that we can refer to these methods using the shorthand MapBuilder::accept notation

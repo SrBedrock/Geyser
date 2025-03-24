@@ -31,10 +31,12 @@ import org.geysermc.mcprotocollib.protocol.data.game.item.component.CustomModelD
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.IntComponentType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.ItemEnchantments;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.Unit;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 @SuppressWarnings("UnstableApiUsage")
@@ -42,6 +44,7 @@ public class ComponentHashers {
     private static final Map<DataComponentType<?>, MinecraftHasher<?>> hashers = new HashMap<>();
 
     static {
+        register(DataComponentTypes.CUSTOM_DATA, hasher -> hasher.nbtMap(Function.identity()));
         register(DataComponentTypes.MAX_STACK_SIZE);
         register(DataComponentTypes.MAX_DAMAGE);
         register(DataComponentTypes.DAMAGE);
@@ -55,6 +58,8 @@ public class ComponentHashers {
 
         register(DataComponentTypes.ITEM_MODEL, MinecraftHasher.KEY);
         register(DataComponentTypes.RARITY, MinecraftHasher.RARITY);
+        register(DataComponentTypes.ENCHANTMENTS,
+            hasher -> hasher.map(ItemEnchantments::getEnchantments, MinecraftHasher.ENCHANTMENT, MinecraftHasher.INT));
     }
 
     private static void register(DataComponentType<Unit> component) {
@@ -62,7 +67,7 @@ public class ComponentHashers {
     }
 
     private static void register(IntComponentType component) {
-        register(component, hasher -> hasher.number(integer -> integer));
+        register(component, MinecraftHasher.INT);
     }
 
     private static <T> void registerMap(DataComponentType<T> component, UnaryOperator<ComponentHashEncoder.MapBuilder<T>> builder) {
