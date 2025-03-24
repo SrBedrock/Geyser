@@ -26,6 +26,7 @@
 package org.geysermc.geyser.item.hashing;
 
 import com.google.common.hash.HashCode;
+import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.CustomModelData;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
@@ -38,7 +39,7 @@ import java.util.function.UnaryOperator;
 
 @SuppressWarnings("UnstableApiUsage")
 public class ComponentHashers {
-    private static final Map<DataComponentType<?>, Hasher<?>> hashers = new HashMap<>();
+    private static final Map<DataComponentType<?>, MinecraftHasher<?>> hashers = new HashMap<>();
 
     static {
         register(DataComponentTypes.MAX_STACK_SIZE);
@@ -51,39 +52,35 @@ public class ComponentHashers {
             .optionalBools("flags", CustomModelData::flags)
             .optionalStrings("strings", CustomModelData::strings)
             .optionalInts("colors", CustomModelData::colors));
+
+        register(DataComponentTypes.ITEM_MODEL, MinecraftHasher.KEY);
+        register(DataComponentTypes.RARITY, MinecraftHasher.RARITY);
     }
 
     private static void register(DataComponentType<Unit> component) {
-        register(component, ComponentHasher::empty);
+        register(component, ComponentHashEncoder::empty);
     }
 
     private static void register(IntComponentType component) {
         register(component, hasher -> hasher.number(integer -> integer));
     }
 
-    private static <T> void registerMap(DataComponentType<T> component, UnaryOperator<ComponentHasher.MapBuilder<T>> builder) {
+    private static <T> void registerMap(DataComponentType<T> component, UnaryOperator<ComponentHashEncoder.MapBuilder<T>> builder) {
         register(component, hasher -> hasher.map(builder));
     }
 
-    private static <T> void register(DataComponentType<T> component, Hasher<T> hasher) {
+    private static <T> void register(DataComponentType<T> component, MinecraftHasher<T> hasher) {
         if (hashers.containsKey(component)) {
             throw new IllegalArgumentException("Tried to register a hasher for a component twice");
         }
         hashers.put(component, hasher);
     }
 
-    public static <T> HashCode hash(DataComponentType<T> component, T value) {
-        Hasher<T> hasher = (Hasher<T>) hashers.get(component);
+    public static <T> HashCode hash(GeyserSession session, DataComponentType<T> component, T value) {
+        MinecraftHasher<T> hasher = (MinecraftHasher<T>) hashers.get(component);
         if (hasher == null) {
             throw new IllegalStateException("Unregistered hasher for component " + component + "!");
         }
-        return hasher.hash(new ComponentHasher<>(value));
-    }
-
-    @SuppressWarnings("UnstableApiUsage")
-    @FunctionalInterface
-    private interface Hasher<T> {
-
-        HashCode hash(ComponentHasher<T> hasher);
+        return hasher.hash(new ComponentHashEncoder<>(session, value));
     }
 }

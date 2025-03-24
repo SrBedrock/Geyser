@@ -29,6 +29,10 @@ import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+import org.cloudburstmc.nbt.NbtList;
+import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtType;
+import org.geysermc.geyser.session.GeyserSession;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,7 +46,7 @@ import java.util.function.UnaryOperator;
 
 // Based off the HashOps in mojmap, hashes a component, TODO: documentation
 @SuppressWarnings("UnstableApiUsage")
-public class ComponentHasher<T> {
+public class ComponentHashEncoder<T> {
     private static final byte TAG_EMPTY = 1;
     private static final byte TAG_MAP_START = 2;
     private static final byte TAG_MAP_END = 3;
@@ -72,14 +76,16 @@ public class ComponentHasher<T> {
     private static final byte[] TRUE = new byte[]{TAG_BOOLEAN, 1};
 
     private final HashFunction hasher;
+    private final GeyserSession session;
     private final T object;
 
     private final HashCode empty;
     private final HashCode falseHash;
     private final HashCode trueHash;
 
-    public ComponentHasher(T object) {
+    public ComponentHashEncoder(GeyserSession session, T object) {
         hasher = Hashing.crc32();
+        this.session = session;
         this.object = object;
 
         empty = hasher.hashBytes(EMPTY);
@@ -141,6 +147,27 @@ public class ComponentHasher<T> {
         return builder.apply(new MapBuilder<>(this)).build();
     }
 
+    public HashCode nbtMap(NbtMap map) {
+        Map<HashCode, HashCode> hashed = new HashMap<>();
+        for (String key : map.keySet()) {
+            HashCode hashedKey = string(key);
+            Object value = map.get(key);
+            if (value instanceof NbtList<?> list) {
+                hashed.put(hashedKey, nbtList(list));
+            } else {
+                map.listenForNumber(key, n -> hashed.put(hashedKey, number(n)));
+                map.listenForString(key, s -> hashed.put(hashedKey, string(s)));
+                map.listenForBoolean(key, b -> hashed.put(hashedKey, bool(b)));
+                map.listenForCompound(key, compound -> hashed.put(hashedKey, nbtMap(compound)));
+
+                map.listenForByteArray(key, bytes -> hashed.put(hashedKey, byteArray(bytes)));
+                map.listenForIntArray(key, ints -> hashed.put(hashedKey, intArray(ints)));
+                map.listenForLongArray(key, longs -> hashed.put(hashedKey, longArray(longs)));
+            }
+        }
+        return map(hashed);
+    }
+
     public HashCode list(List<HashCode> list) {
         Hasher listHasher = hasher.newHasher();
         listHasher.putByte(TAG_LIST_START);
@@ -153,11 +180,70 @@ public class ComponentHasher<T> {
         return builder.apply(new ListBuilder<>(this)).build();
     }
 
+    @SuppressWarnings("unchecked")
+    public HashCode nbtList(NbtList<?> nbtList) {
+        NbtType<?> type = nbtList.getType();
+        return list(builder -> {
+            if (type == NbtType.BYTE) {
+                builder.acceptBytes((List<Byte>) nbtList);
+            } else if (type == NbtType.SHORT) {
+                builder.acceptShorts((List<Short>) nbtList);
+            } else if (type == NbtType.INT) {
+                builder.acceptInts((List<Integer>) nbtList);
+            } else if (type == NbtType.LONG) {
+                builder.acceptLongs((List<Long>) nbtList);
+            } else if (type == NbtType.FLOAT) {
+                builder.acceptFloats((List<Float>) nbtList);
+            } else if (type == NbtType.DOUBLE) {
+                builder.acceptDoubles((List<Double>) nbtList);
+            } else if (type == NbtType.STRING) {
+                builder.acceptStrings((List<String>) nbtList);
+            } else if (type == NbtType.LIST) {
+                for (NbtList<?> list : (List<NbtList<?>>) nbtList) {
+                    builder.accept(nbtList(list));
+                }
+            } else if (type == NbtType.COMPOUND) {
+                for (NbtMap compound : (List<NbtMap>) nbtList) {
+                    builder.accept(nbtMap(compound));
+                }
+            }
+            return builder;
+        });
+    }
+
+    public HashCode byteArray(byte[] bytes) {
+        Hasher arrayHasher = hasher.newHasher();
+        arrayHasher.putByte(TAG_BYTE_ARRAY_START);
+        arrayHasher.putBytes(bytes);
+        arrayHasher.putByte(TAG_BYTE_ARRAY_END);
+        return arrayHasher.hash();
+    }
+
+    public HashCode intArray(int[] ints) {
+        Hasher arrayHasher = hasher.newHasher();
+        arrayHasher.putByte(TAG_INT_ARRAY_START);
+        for (int i : ints) {
+            arrayHasher.putInt(i);
+        }
+        arrayHasher.putByte(TAG_INT_ARRAY_END);
+        return arrayHasher.hash();
+    }
+
+    public HashCode longArray(long[] longs) {
+        Hasher arrayHasher = hasher.newHasher();
+        arrayHasher.putByte(TAG_LONG_ARRAY_START);
+        for (long l : longs) {
+            arrayHasher.putLong(l);
+        }
+        arrayHasher.putByte(TAG_LONG_ARRAY_END);
+        return arrayHasher.hash();
+    }
+
     public static class MapBuilder<T> {
-        private final ComponentHasher<T> hasher;
+        private final ComponentHashEncoder<T> hasher;
         private final Map<HashCode, HashCode> map;
 
-        private MapBuilder(ComponentHasher<T> hasher) {
+        private MapBuilder(ComponentHashEncoder<T> hasher) {
             this.hasher = hasher;
             map = new HashMap<>();
         }
@@ -165,6 +251,10 @@ public class ComponentHasher<T> {
         public MapBuilder<T> accept(String key, HashCode hash) {
             map.put(hasher.string(key), hash);
             return this;
+        }
+
+        public <V> MapBuilder<T> accept(String key, MinecraftHasher<V> valueHasher, V value) {
+            return accept(key, valueHasher.hash(new ComponentHashEncoder<>(hasher.session, value)));
         }
 
         // Not using abstract Number class here so that we can refer to these methods using the shorthand MapBuilder::accept notation
@@ -356,100 +446,121 @@ public class ComponentHasher<T> {
     }
 
     public static class ListBuilder<T> {
-        private final ComponentHasher<T> hasher;
+        private final ComponentHashEncoder<T> hasher;
         private final List<HashCode> list;
 
-        private ListBuilder(ComponentHasher<T> hasher) {
+        private ListBuilder(ComponentHashEncoder<T> hasher) {
             this.hasher = hasher;
             list = new ArrayList<>();
         }
 
-        public ListBuilder<T> accept(byte value) {
-            list.add(hasher.number(value));
+        public ListBuilder<T> accept(HashCode hash) {
+            list.add(hash);
             return this;
+        }
+
+        public ListBuilder<T> accept(byte value) {
+            return accept(hasher.number(value));
         }
 
         public ListBuilder<T> accept(short value) {
-            list.add(hasher.number(value));
-            return this;
+            return accept(hasher.number(value));
         }
 
         public ListBuilder<T> accept(int value) {
-            list.add(hasher.number(value));
-            return this;
+            return accept(hasher.number(value));
         }
 
         public ListBuilder<T> accept(long value) {
-            list.add(hasher.number(value));
-            return this;
+            return accept(hasher.number(value));
         }
 
         public ListBuilder<T> accept(float value) {
-            list.add(hasher.number(value));
-            return this;
+            return accept(hasher.number(value));
         }
 
         public ListBuilder<T> accept(double value) {
-            list.add(hasher.number(value));
+            return accept(hasher.number(value));
+        }
+
+        public ListBuilder<T> acceptBytes(List<Byte> bytes) {
+            bytes.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptBytes(Function<T, List<Byte>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
+            return acceptBytes(extractor.apply(hasher.object));
+        }
+
+        public ListBuilder<T> acceptShorts(List<Short> shorts) {
+            shorts.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptShorts(Function<T, List<Short>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
+            return acceptShorts(extractor.apply(hasher.object));
+        }
+
+        public ListBuilder<T> acceptInts(List<Integer> ints) {
+            ints.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptInts(Function<T, List<Integer>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
+            return acceptInts(extractor.apply(hasher.object));
+        }
+
+        public ListBuilder<T> acceptLongs(List<Long> longs) {
+            longs.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptLongs(Function<T, List<Long>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
+            return acceptLongs(extractor.apply(hasher.object));
+        }
+
+        public ListBuilder<T> acceptFloats(List<Float> floats) {
+            floats.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptFloats(Function<T, List<Float>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
+            return acceptFloats(extractor.apply(hasher.object));
+        }
+
+        public ListBuilder<T> acceptDoubles(List<Double> doubles) {
+            doubles.forEach(this::accept);
             return this;
         }
 
         public ListBuilder<T> acceptDoubles(Function<T, List<Double>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
-            return this;
+            return acceptDoubles(extractor.apply(hasher.object));
         }
 
         public ListBuilder<T> accept(String value) {
-            list.add(hasher.string(value));
-            return this;
+            return accept(hasher.string(value));
         }
 
-        public ListBuilder<T> acceptString(Function<T, String> extractor) {
-            return accept(extractor.apply(hasher.object));
+        public ListBuilder<T> acceptStrings(List<String> strings) {
+            strings.forEach(this::accept);
+            return this;
         }
 
         public ListBuilder<T> acceptStrings(Function<T, List<String>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
-            return this;
+            return acceptStrings(extractor.apply(hasher.object));
         }
 
         public ListBuilder<T> accept(boolean value) {
-            list.add(hasher.bool(value));
-            return this;
+            return accept(hasher.bool(value));
         }
 
-        public ListBuilder<T> acceptBool(Predicate<T> extractor) {
-            return accept(extractor.test(hasher.object));
+        public ListBuilder<T> acceptBools(List<Boolean> bools) {
+            bools.forEach(this::accept);
+            return this;
         }
 
         public ListBuilder<T> acceptBools(Function<T, List<Boolean>> extractor) {
-            extractor.apply(hasher.object).forEach(this::accept);
-            return this;
+            return acceptBools(extractor.apply(hasher.object));
         }
 
         public HashCode build() {
