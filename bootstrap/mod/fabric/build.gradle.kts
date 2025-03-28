@@ -48,6 +48,10 @@ tasks.withType<Jar> {
 relocate("org.cloudburstmc.netty")
 relocate("org.cloudburstmc.protocol")
 
+fabricApi {
+    configureTests()
+}
+
 tasks {
     remapJar {
         archiveBaseName.set("Geyser-Fabric")
