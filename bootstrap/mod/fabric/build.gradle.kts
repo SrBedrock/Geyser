@@ -48,7 +48,29 @@ tasks.withType<Jar> {
 relocate("org.cloudburstmc.netty")
 relocate("org.cloudburstmc.protocol")
 
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "geyser-fabric-tests"
+        enableClientGameTests = false
+        eula = true
+    }
+}
+
 tasks {
+    getByName("processGametestResources", ProcessResources::class) {
+        filesMatching("fabric.mod.json") {
+            expand(
+                "id" to "geyser",
+                "name" to "Geyser",
+                "version" to project.version,
+                "description" to project.description,
+                "url" to "https://geysermc.org",
+                "author" to "GeyserMC"
+            )
+        }
+    }
+
     remapJar {
         archiveBaseName.set("Geyser-Fabric")
     }
