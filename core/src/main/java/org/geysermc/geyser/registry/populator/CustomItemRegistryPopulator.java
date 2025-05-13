@@ -315,6 +315,9 @@ public class CustomItemRegistryPopulator {
                 return new BlockPlacer(Identifier.of("fire"), false);
             } else if (mapping.getFirstBlockRuntimeId() != null) {
                 return new BlockPlacer(Identifier.of(mapping.getBedrockIdentifier()), false);
+            } else if (bedrockIdentifier.equals("minecraft:paper")) {
+                System.out.println("paper custom item, using fake block placer with air");
+                return new BlockPlacer(Identifier.of("minecraft:air"), false);
             }
             return null;
         }).orElse(customItemDefinition.components().get(GeyserDataComponent.BLOCK_PLACER));
