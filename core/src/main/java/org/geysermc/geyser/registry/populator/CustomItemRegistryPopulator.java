@@ -490,7 +490,7 @@ public class CustomItemRegistryPopulator {
             .build());
     }
 
-    private static void computeBlockItemProperties(BlockPlacer blockPlacer, NbtMapBuilder componentBuilder) {
+    private static void computeBlockItemProperties(BlockPlacer blockPlacer, NbtMapBuilder componentBuilder, Identifier bedrock) {
         // carved pumpkin should be able to be worn and for that we would need to add wearable and armor with protection 0 here
         // however this would have the side effect of preventing carved pumpkins from working as an attachable on the RP side outside the head slot
         // it also causes the item to glitch when right-clicked to "equip" so this should only be added here later if these issues can be overcome
@@ -499,6 +499,12 @@ public class CustomItemRegistryPopulator {
         componentBuilder.putCompound("minecraft:block_placer", NbtMap.builder()
             .putString("block", blockPlacer.block().toString())
             .putBoolean("canUseBlockAsIcon", blockPlacer.replaceBlockItem()) // TODO is this right?
+            .putList("use_on", NbtType.STRING)
+            .build());
+
+        System.out.println("block placer on item " + bedrock + ": " + NbtMap.builder()
+            .putString("block", blockPlacer.block().toString())
+            .putBoolean("canUseBlockAsIcon", blockPlacer.replaceBlockItem())
             .putList("use_on", NbtType.STRING)
             .build());
     }
