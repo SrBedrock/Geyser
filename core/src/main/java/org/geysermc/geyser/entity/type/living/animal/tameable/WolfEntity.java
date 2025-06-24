@@ -73,6 +73,12 @@ public class WolfEntity extends TameableEntity implements VariantIntHolder {
     }
 
     @Override
+    public void setEntityProperty(String property, boolean value) {
+        System.out.println("property " + property + " to " + value);
+        propertyManager.add(property, value);
+    }
+
+    @Override
     public void setTameableFlags(ByteEntityMetadata entityMetadata) {
         super.setTameableFlags(entityMetadata);
         // Reset wolf color

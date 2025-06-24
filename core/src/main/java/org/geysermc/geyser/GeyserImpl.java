@@ -184,6 +184,7 @@ public class GeyserImpl implements GeyserApi, EventRegistrar {
     /**
      * Determines if we're currently reloading. Replaces per-bootstrap reload checks
      */
+    @Setter
     private volatile boolean isReloading;
 
     /**

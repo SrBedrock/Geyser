@@ -35,13 +35,19 @@ import java.util.List;
 
 public class GeyserEntityPropertyManager {
 
-    private final GeyserEntityProperties properties;
-
     private final ObjectArrayList<IntEntityProperty> intEntityProperties = new ObjectArrayList<>();
     private final ObjectArrayList<FloatEntityProperty> floatEntityProperties = new ObjectArrayList<>();
 
+    private GeyserEntityProperties properties;
+
     public GeyserEntityPropertyManager(GeyserEntityProperties properties) {
         this.properties = properties;
+    }
+
+    public void reload(GeyserEntityProperties properties) {
+        this.properties = properties;
+        intEntityProperties.clear();
+        floatEntityProperties.clear();
     }
 
     public void add(String propertyName, int value) {

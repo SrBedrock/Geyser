@@ -43,6 +43,7 @@ import org.geysermc.geyser.entity.type.player.PlayerEntity;
 import org.geysermc.geyser.entity.type.player.SessionPlayerEntity;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.EntityCache;
+import org.geysermc.geyser.session.cache.EntityPropertyCache;
 import org.geysermc.geyser.session.cache.WorldCache;
 import org.geysermc.geyser.session.cache.waypoint.WaypointCache;
 import org.mockito.stubbing.Answer;
@@ -78,6 +79,9 @@ public class GeyserMockContextScoreboard {
 
         var entityCache = context.spy(new EntityCache(session));
         when(session.getEntityCache()).thenReturn(entityCache);
+
+        var entityPropertyCache = context.spy(new EntityPropertyCache(session));
+        when(session.getEntityPropertyCache()).thenReturn(entityPropertyCache);
 
         var worldCache = context.spy(new WorldCache(session));
         when(session.getWorldCache()).thenReturn(worldCache);

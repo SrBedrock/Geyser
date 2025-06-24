@@ -244,6 +244,7 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
 
         geyserPingPassthrough = GeyserLegacyPingPassthrough.init(geyser);
 
+        GeyserImpl.getInstance().setReloading(false);
         geyserLogger.start();
     }
 

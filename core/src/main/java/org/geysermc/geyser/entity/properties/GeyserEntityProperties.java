@@ -26,6 +26,7 @@
 package org.geysermc.geyser.entity.properties;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMaps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.EqualsAndHashCode;
@@ -47,6 +48,8 @@ import java.util.List;
 @EqualsAndHashCode
 @ToString
 public class GeyserEntityProperties {
+    public static final GeyserEntityProperties EMPTY = new GeyserEntityProperties(ObjectArrayList.of(), Object2IntMaps.emptyMap());
+
     private final ObjectArrayList<PropertyType> properties;
     private final Object2IntMap<String> propertyIndices;
 
@@ -79,6 +82,13 @@ public class GeyserEntityProperties {
     public static class Builder {
         private final ObjectArrayList<PropertyType> properties = new ObjectArrayList<>();
         private final Object2IntMap<String> propertyIndices = new Object2IntOpenHashMap<>();
+
+        public Builder() {}
+
+        public Builder(GeyserEntityProperties base) {
+            properties.addAll(base.properties);
+            propertyIndices.putAll(base.propertyIndices);
+        }
 
         public Builder addInt(@NonNull String name, int min, int max) {
             if (propertyIndices.containsKey(name)) {

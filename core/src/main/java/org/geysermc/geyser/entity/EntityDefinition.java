@@ -51,10 +51,10 @@ import java.util.function.BiConsumer;
  * @param <T> the entity type this definition represents
  */
 public record EntityDefinition<T extends Entity>(EntityFactory<T> factory, EntityType entityType, String identifier,
-                                                 float width, float height, float offset, GeyserEntityProperties registeredProperties, List<EntityMetadataTranslator<? super T, ?, ?>> translators) {
+                                                 float width, float height, float offset, GeyserEntityProperties defaultProperties, List<EntityMetadataTranslator<? super T, ?, ?>> translators) {
 
     public static <T extends Entity> Builder<T> inherited(EntityFactory<T> factory, EntityDefinition<? super T> parent) {
-        return new Builder<>(factory, parent.entityType, parent.identifier, parent.width, parent.height, parent.offset, parent.registeredProperties, new ObjectArrayList<>(parent.translators));
+        return new Builder<>(factory, parent.entityType, parent.identifier, parent.width, parent.height, parent.offset, parent.defaultProperties, new ObjectArrayList<>(parent.translators));
     }
 
     public static <T extends Entity> Builder<T> builder(EntityFactory<T> factory) {
@@ -162,8 +162,8 @@ public record EntityDefinition<T extends Entity>(EntityFactory<T> factory, Entit
             if (register && definition.entityType() != null) {
                 Registries.ENTITY_DEFINITIONS.get().putIfAbsent(definition.entityType(), definition);
                 Registries.JAVA_ENTITY_IDENTIFIERS.get().putIfAbsent("minecraft:" + type.name().toLowerCase(Locale.ROOT), definition);
-                if (definition.registeredProperties() != null) {
-                    Registries.BEDROCK_ENTITY_PROPERTIES.get().add(definition.registeredProperties().toNbtMap(identifier));
+                if (definition.defaultProperties() != null) {
+                    Registries.DEFAULT_BEDROCK_ENTITY_PROPERTIES.get().put(type, definition.defaultProperties());
                 }
             }
             return definition;

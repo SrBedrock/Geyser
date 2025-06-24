@@ -33,13 +33,12 @@ import org.geysermc.geyser.entity.type.living.animal.AnimalEntity;
 import org.geysermc.geyser.entity.type.living.animal.VariantHolder;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.RegistryCache;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 
 import java.util.Locale;
 import java.util.UUID;
 
 public abstract class TemperatureVariantAnimal extends AnimalEntity implements VariantHolder<TemperatureVariantAnimal.BuiltInVariant> {
-
-    public static final RegistryCache.RegistryReader<BuiltInVariant> VARIANT_READER = VariantHolder.reader(BuiltInVariant.class, BuiltInVariant.TEMPERATE);
 
     public TemperatureVariantAnimal(GeyserSession session, int entityId, long geyserId, UUID uuid, EntityDefinition<?> definition,
                                     Vector3f position, Vector3f motion, float yaw, float pitch, float headYaw) {
@@ -56,6 +55,10 @@ public abstract class TemperatureVariantAnimal extends AnimalEntity implements V
     public void setBedrockVariant(BuiltInVariant variant) {
         propertyManager.add(VanillaEntityProperties.CLIMATE_VARIANT_ID, variant.toBedrock());
         updateBedrockEntityProperties();
+    }
+
+    public static RegistryCache.RegistryReader<BuiltInVariant> reader(EntityType type) {
+        return VariantHolder.reader(type, BuiltInVariant.class, BuiltInVariant.TEMPERATE);
     }
 
     public enum BuiltInVariant implements VariantHolder.BuiltIn {

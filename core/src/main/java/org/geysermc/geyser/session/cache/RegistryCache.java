@@ -59,6 +59,7 @@ import org.geysermc.geyser.translator.level.BiomeTranslator;
 import org.geysermc.geyser.util.MinecraftKey;
 import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
 import org.geysermc.mcprotocollib.protocol.data.game.RegistryEntry;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundRegistryDataPacket;
 
 import java.util.ArrayList;
@@ -90,14 +91,14 @@ public final class RegistryCache {
         register(JavaRegistries.DAMAGE_TYPE, RegistryReader.UNIT);
         register(JavaRegistries.DIALOG, Dialog::readDialog);
 
-        register(JavaRegistries.CAT_VARIANT, VariantHolder.reader(CatEntity.BuiltInVariant.class, CatEntity.BuiltInVariant.BLACK));
-        register(JavaRegistries.FROG_VARIANT, VariantHolder.reader(FrogEntity.BuiltInVariant.class, FrogEntity.BuiltInVariant.TEMPERATE));
-        register(JavaRegistries.WOLF_VARIANT, VariantHolder.reader(WolfEntity.BuiltInVariant.class, WolfEntity.BuiltInVariant.PALE));
+        register(JavaRegistries.CAT_VARIANT, VariantHolder.reader(EntityType.CAT, CatEntity.BuiltInVariant.class, CatEntity.BuiltInVariant.BLACK));
+        register(JavaRegistries.FROG_VARIANT, VariantHolder.reader(EntityType.FROG, FrogEntity.BuiltInVariant.class, FrogEntity.BuiltInVariant.TEMPERATE));
+        register(JavaRegistries.WOLF_VARIANT, VariantHolder.reader(EntityType.WOLF, WolfEntity.BuiltInVariant.class, WolfEntity.BuiltInVariant.PALE));
         register(JavaRegistries.WOLF_SOUND_VARIANT, RegistryReader.UNIT);
 
-        register(JavaRegistries.PIG_VARIANT, TemperatureVariantAnimal.VARIANT_READER);
-        register(JavaRegistries.COW_VARIANT, TemperatureVariantAnimal.VARIANT_READER);
-        register(JavaRegistries.CHICKEN_VARIANT, TemperatureVariantAnimal.VARIANT_READER);
+        register(JavaRegistries.PIG_VARIANT, TemperatureVariantAnimal.reader(EntityType.PIG));
+        register(JavaRegistries.COW_VARIANT, TemperatureVariantAnimal.reader(EntityType.COW));
+        register(JavaRegistries.CHICKEN_VARIANT, TemperatureVariantAnimal.reader(EntityType.CHICKEN));
 
         // Load from MCProtocolLib's classloader
         NbtMap tag = MinecraftProtocol.loadNetworkCodec();

@@ -36,6 +36,7 @@ import org.cloudburstmc.protocol.bedrock.data.inventory.crafting.PotionMixData;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.geysermc.geyser.GeyserImpl;
 import org.geysermc.geyser.entity.EntityDefinition;
+import org.geysermc.geyser.entity.properties.GeyserEntityProperties;
 import org.geysermc.geyser.inventory.recipe.GeyserRecipe;
 import org.geysermc.geyser.item.type.Item;
 import org.geysermc.geyser.pack.ResourcePackHolder;
@@ -126,7 +127,8 @@ public final class Registries {
     /**
      * A registry holding a list of all the known entity properties to be sent to the client after start game.
      */
-    public static final SimpleRegistry<Set<NbtMap>> BEDROCK_ENTITY_PROPERTIES = SimpleRegistry.create(RegistryLoaders.empty(HashSet::new));
+    // TODO not really needed anymore
+    public static final SimpleMappedRegistry<EntityType, GeyserEntityProperties> DEFAULT_BEDROCK_ENTITY_PROPERTIES = SimpleMappedRegistry.create(RegistryLoaders.empty(() -> new EnumMap<>(EntityType.class)));
 
     /**
      * A map containing all Java entity identifiers and their respective Geyser definitions

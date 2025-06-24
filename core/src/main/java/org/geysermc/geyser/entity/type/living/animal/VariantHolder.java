@@ -31,6 +31,7 @@ import org.geysermc.geyser.session.cache.RegistryCache;
 import org.geysermc.geyser.session.cache.registry.JavaRegistryKey;
 import org.geysermc.geyser.util.MinecraftKey;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.IntEntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 
 import java.util.Locale;
 
@@ -56,12 +57,15 @@ public interface VariantHolder<BedrockVariant extends VariantHolder.BuiltIn> {
      */
     default void setVariantFromJavaId(int variant) {
         setBedrockVariant(variantRegistry().value(getSession(), variant));
+        if (!variantRegistry().key(getSession(), variant).namespace().equals("minecraft")) {
+            setEntityProperty(variantRegistry().key(getSession(), variant).toString(), true);
+        }
     }
 
     GeyserSession getSession();
 
     /**
-     * The registry in {@link org.geysermc.geyser.session.cache.registry.JavaRegistries} for this mob's variants. The registry can utilise the {@link VariantHolder#reader(Class, Enum)} method
+     * The registry in {@link org.geysermc.geyser.session.cache.registry.JavaRegistries} for this mob's variants. The registry can utilise the {@link VariantHolder#reader(EntityType, Class, Enum)} method
      * to create a reader to be used in {@link org.geysermc.geyser.session.cache.RegistryCache}.
      */
     JavaRegistryKey<? extends BedrockVariant> variantRegistry();
@@ -71,12 +75,14 @@ public interface VariantHolder<BedrockVariant extends VariantHolder.BuiltIn> {
      */
     void setBedrockVariant(BedrockVariant bedrockVariant);
 
+    default void setEntityProperty(String property, boolean value) {}
+
     /**
      * Creates a registry reader for this mob's variants.
      *
      * <p>This reader simply matches the identifiers of registry entries with built-in variants. If no built-in variant matches, the fallback/default is returned.</p>
      */
-    static <BuiltInVariant extends Enum<? extends BuiltIn>> RegistryCache.RegistryReader<BuiltInVariant> reader(Class<BuiltInVariant> clazz, BuiltInVariant fallback) {
+    static <BuiltInVariant extends Enum<? extends BuiltIn>> RegistryCache.RegistryReader<BuiltInVariant> reader(EntityType type, Class<BuiltInVariant> clazz, BuiltInVariant fallback) {
         BuiltInVariant[] variants = clazz.getEnumConstants();
         if (variants == null) {
             throw new IllegalArgumentException("Class is not an enum");
@@ -87,6 +93,7 @@ public interface VariantHolder<BedrockVariant extends VariantHolder.BuiltIn> {
                     return variant;
                 }
             }
+            context.session().getEntityPropertyCache().addProperties(type, builder -> builder.addBoolean(context.id().toString()));
             return fallback;
         };
     }

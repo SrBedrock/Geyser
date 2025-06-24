@@ -163,6 +163,7 @@ import org.geysermc.geyser.session.cache.BundleCache;
 import org.geysermc.geyser.session.cache.ChunkCache;
 import org.geysermc.geyser.session.cache.EntityCache;
 import org.geysermc.geyser.session.cache.EntityEffectCache;
+import org.geysermc.geyser.session.cache.EntityPropertyCache;
 import org.geysermc.geyser.session.cache.FormCache;
 import org.geysermc.geyser.session.cache.InputCache;
 import org.geysermc.geyser.session.cache.LodestoneCache;
@@ -279,6 +280,7 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
     private final ChunkCache chunkCache;
     private final EntityCache entityCache;
     private final EntityEffectCache effectCache;
+    private final EntityPropertyCache entityPropertyCache;
     private final FormCache formCache;
     private final InputCache inputCache;
     private final LodestoneCache lodestoneCache;
@@ -737,6 +739,7 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
         this.chunkCache = new ChunkCache(this);
         this.entityCache = new EntityCache(this);
         this.effectCache = new EntityEffectCache();
+        this.entityPropertyCache = new EntityPropertyCache(this);
         this.formCache = new FormCache(this);
         this.inputCache = new InputCache(this);
         this.lodestoneCache = new LodestoneCache();
@@ -807,8 +810,8 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
         }
 
         startGame();
+        entityPropertyCache.syncAllEntityProperties();
         sentSpawnPacket = true;
-        syncEntityProperties();
 
         if (GameProtocol.isPreCreativeInventoryRewrite(this.protocolVersion())) {
             ItemComponentPacket componentPacket = new ItemComponentPacket();
@@ -1729,14 +1732,6 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
         startGamePacket.setOwnerId("");
 
         upstream.sendPacket(startGamePacket);
-    }
-
-    private void syncEntityProperties() {
-        for (NbtMap nbtMap : Registries.BEDROCK_ENTITY_PROPERTIES.get()) {
-            SyncEntityPropertyPacket syncEntityPropertyPacket = new SyncEntityPropertyPacket();
-            syncEntityPropertyPacket.setData(nbtMap);
-            upstream.sendPacket(syncEntityPropertyPacket);
-        }
     }
 
     /**
