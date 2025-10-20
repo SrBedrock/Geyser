@@ -150,7 +150,7 @@ public class GeyserLocale {
         } else {
             if (!validLocalLanguage) {
                 // Don't warn on missing locales if a local file has been found
-                bootstrap.getGeyserLogger().warning("Missing locale: " + locale);
+                bootstrap.getGeyserLogger().debug("Missing locale: " + locale);
             }
         }
 
@@ -158,7 +158,7 @@ public class GeyserLocale {
         // By loading both, we ensure that if a language string doesn't exist in the custom properties folder,
         // it's loaded from our jar
         if (validLocalLanguage) {
-            try (InputStream stream = new FileInputStream(localLanguage)) {
+            try (InputStreamReader stream = new InputStreamReader(new FileInputStream(localLanguage), StandardCharsets.UTF_8)) {
                 localeProp.load(stream);
             } catch (IOException e) {
                 String message = "Unable to load custom language override!";
@@ -259,6 +259,13 @@ public class GeyserLocale {
             // Invalid locale
             return locale;
         }
+
+        // See https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes - covers the special case that is norwegian
+        String lowerCaseLocale = locale.toLowerCase(Locale.ROOT);
+        if (lowerCaseLocale.equals("nn_no") || lowerCaseLocale.equals("no_no")) {
+            locale = "nb_NO";
+        }
+
         String language = locale.substring(0, 2);
         String country = locale.substring(3);
         return language.toLowerCase(Locale.ENGLISH) + "_" + country.toUpperCase(Locale.ENGLISH);

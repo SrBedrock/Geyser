@@ -29,7 +29,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
-import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntImmutableList;
+import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.IntLists;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.cloudburstmc.math.vector.Vector3i;
 import org.cloudburstmc.nbt.NBTOutputStream;
@@ -48,6 +53,7 @@ import org.geysermc.geyser.level.chunk.bitarray.BitArrayVersion;
 import org.geysermc.geyser.level.chunk.bitarray.SingletonBitArray;
 import org.geysermc.geyser.registry.BlockRegistries;
 import org.geysermc.geyser.session.GeyserSession;
+import org.geysermc.geyser.session.cache.registry.JavaRegistries;
 import org.geysermc.geyser.translator.level.BiomeTranslator;
 import org.geysermc.geyser.translator.level.block.entity.BedrockChunkWantsBlockEntityTag;
 import org.geysermc.geyser.translator.level.block.entity.BlockEntityTranslator;
@@ -56,7 +62,7 @@ import org.geysermc.geyser.translator.protocol.PacketTranslator;
 import org.geysermc.geyser.translator.protocol.Translator;
 import org.geysermc.geyser.util.BlockEntityUtils;
 import org.geysermc.geyser.util.ChunkUtils;
-import org.geysermc.geyser.util.DimensionUtils;
+import org.geysermc.mcprotocollib.protocol.codec.MinecraftTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.chunk.BitStorage;
 import org.geysermc.mcprotocollib.protocol.data.game.chunk.ChunkSection;
 import org.geysermc.mcprotocollib.protocol.data.game.chunk.DataPalette;
@@ -99,25 +105,30 @@ public class JavaLevelChunkWithLightTranslator extends PacketTranslator<Clientbo
         BitSet waterloggedPaletteIds = new BitSet();
         BitSet bedrockOnlyBlockEntityIds = new BitSet();
 
-        BedrockDimension bedrockDimension = session.getChunkCache().getBedrockDimension();
+        BedrockDimension bedrockDimension = session.getBedrockDimension();
         int maxBedrockSectionY = (bedrockDimension.height() >> 4) - 1;
 
         int sectionCount;
         byte[] payload;
         ByteBuf byteBuf = null;
-        GeyserChunkSection[] sections = new GeyserChunkSection[javaChunks.length - (yOffset + (bedrockDimension.minY() >> 4))];
+
+        // calculate the difference between the java dimension minY and the bedrock dimension minY as
+        // the java chunk sections may need to be placed higher up in the bedrock chunk section array
+        int sectionCountDiff = yOffset - (bedrockDimension.minY() >> 4);
+        GeyserChunkSection[] sections = new GeyserChunkSection[chunkSize + sectionCountDiff];
 
         try {
             ByteBuf in = Unpooled.wrappedBuffer(packet.getChunkData());
             boolean extendedCollisionNextSection = false;
             for (int sectionY = 0; sectionY < chunkSize; sectionY++) {
-                ChunkSection javaSection = session.getDownstream().getCodecHelper().readChunkSection(in);
-                javaChunks[sectionY] = javaSection.getChunkData();
+                ChunkSection javaSection = MinecraftTypes.readChunkSection(in, BlockRegistries.BLOCK_STATES.get().size(),
+                    session.getRegistryCache().registry(JavaRegistries.BIOME).size());
+                javaChunks[sectionY] = javaSection.getBlockData();
                 javaBiomes[sectionY] = javaSection.getBiomeData();
                 boolean extendedCollision = extendedCollisionNextSection;
                 boolean thisExtendedCollisionNextSection = false;
 
-                int bedrockSectionY = sectionY + (yOffset - (bedrockDimension.minY() >> 4));
+                int bedrockSectionY = sectionY + sectionCountDiff;
                 int subChunkIndex = sectionY + yOffset;
                 if (bedrockSectionY < 0 || maxBedrockSectionY < bedrockSectionY) {
                     // Ignore this chunk section since it goes outside the bounds accepted by the Bedrock client
@@ -154,8 +165,8 @@ public class JavaLevelChunkWithLightTranslator extends PacketTranslator<Clientbo
                     continue;
                 }
 
-                Palette javaPalette = javaSection.getChunkData().getPalette();
-                BitStorage javaData = javaSection.getChunkData().getStorage();
+                Palette javaPalette = javaSection.getBlockData().getPalette();
+                BitStorage javaData = javaSection.getBlockData().getStorage();
 
                 if (javaPalette instanceof GlobalPalette) {
                     // As this is the global palette, simply iterate through the whole chunk section once
@@ -398,29 +409,34 @@ public class JavaLevelChunkWithLightTranslator extends PacketTranslator<Clientbo
 
                 // Get the Java block state ID from block entity position
                 DataPalette section = javaChunks[(y >> 4) - yOffset];
-                BlockState blockState = BlockRegistries.BLOCK_STATES.get(section.get(x, y & 0xF, z));
+                BlockState blockState = BlockState.of(section.get(x, y & 0xF, z));
 
                 // Note that, since 1.20.5, tags can be null, but Bedrock still needs a default tag to render the item
                 // Also, some properties - like banner base colors - are part of the tag and is processed here.
                 BlockEntityTranslator blockEntityTranslator = BlockEntityUtils.getBlockEntityTranslator(type);
-                bedrockBlockEntities.add(blockEntityTranslator.getBlockEntityTag(session, type, x + chunkBlockX, y, z + chunkBlockZ, tag, blockState));
 
-                // Check for custom skulls
-                if (session.getPreferencesCache().showCustomSkulls() && type == BlockEntityType.SKULL && tag != null && tag.containsKey("profile")) {
-                    BlockDefinition blockDefinition = SkullBlockEntityTranslator.translateSkull(session, tag, Vector3i.from(x + chunkBlockX, y, z + chunkBlockZ), blockState);
-                    if (blockDefinition != null) {
-                        int bedrockSectionY = (y >> 4) - (bedrockDimension.minY() >> 4);
-                        int subChunkIndex = (y >> 4) + (bedrockDimension.minY() >> 4);
-                        if (0 <= bedrockSectionY && bedrockSectionY < maxBedrockSectionY) {
-                            // Custom skull is in a section accepted by Bedrock
-                            GeyserChunkSection bedrockSection = sections[bedrockSectionY];
-                            IntList palette = bedrockSection.getBlockStorageArray()[0].getPalette();
-                            if (palette instanceof IntImmutableList || palette instanceof IntLists.Singleton) {
-                                // TODO there has to be a better way to expand the palette .-.
-                                bedrockSection = bedrockSection.copy(subChunkIndex);
-                                sections[bedrockSectionY] = bedrockSection;
+                // The Java server can send block entity data for blocks that aren't actually those blocks.
+                // A Java client ignores these
+                if (type == blockState.block().blockEntityType()) {
+                    bedrockBlockEntities.add(blockEntityTranslator.getBlockEntityTag(session, type, x + chunkBlockX, y, z + chunkBlockZ, tag, blockState));
+
+                    // Check for custom skulls
+                    if (session.getPreferencesCache().showCustomSkulls() && type == BlockEntityType.SKULL && tag != null && tag.containsKey("profile")) {
+                        BlockDefinition blockDefinition = SkullBlockEntityTranslator.translateSkull(session, tag, Vector3i.from(x + chunkBlockX, y, z + chunkBlockZ), blockState);
+                        if (blockDefinition != null) {
+                            int bedrockSectionY = (y >> 4) - (bedrockDimension.minY() >> 4);
+                            int subChunkIndex = (y >> 4) + (bedrockDimension.minY() >> 4);
+                            if (0 <= bedrockSectionY && bedrockSectionY < maxBedrockSectionY) {
+                                // Custom skull is in a section accepted by Bedrock
+                                GeyserChunkSection bedrockSection = sections[bedrockSectionY];
+                                IntList palette = bedrockSection.getBlockStorageArray()[0].getPalette();
+                                if (palette instanceof IntImmutableList || palette instanceof IntLists.Singleton) {
+                                    // TODO there has to be a better way to expand the palette .-.
+                                    bedrockSection = bedrockSection.copy(subChunkIndex);
+                                    sections[bedrockSectionY] = bedrockSection;
+                                }
+                                bedrockSection.setFullBlock(x, y & 0xF, z, 0, blockDefinition.getRuntimeId());
                             }
-                            bedrockSection.setFullBlock(x, y & 0xF, z, 0, blockDefinition.getRuntimeId());
                         }
                     }
                 }
@@ -504,7 +520,7 @@ public class JavaLevelChunkWithLightTranslator extends PacketTranslator<Clientbo
         levelChunkPacket.setChunkX(packet.getX());
         levelChunkPacket.setChunkZ(packet.getZ());
         levelChunkPacket.setData(Unpooled.wrappedBuffer(payload));
-        levelChunkPacket.setDimension(DimensionUtils.javaToBedrock(session.getChunkCache().getBedrockDimension()));
+        levelChunkPacket.setDimension(session.getBedrockDimension().bedrockId());
         session.sendUpstreamPacket(levelChunkPacket);
 
         for (Map.Entry<Vector3i, ItemFrameEntity> entry : session.getItemFrameCache().entrySet()) {

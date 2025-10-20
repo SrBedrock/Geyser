@@ -25,17 +25,16 @@
 
 package org.geysermc.geyser.session.cache;
 
-import org.geysermc.geyser.level.block.type.Block;
-import org.geysermc.mcprotocollib.protocol.data.game.chunk.DataPalette;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import lombok.Getter;
 import lombok.Setter;
-import org.geysermc.geyser.level.BedrockDimension;
-import org.geysermc.geyser.level.block.BlockStateValues;
+import org.geysermc.geyser.GeyserImpl;
+import org.geysermc.geyser.level.block.type.Block;
 import org.geysermc.geyser.level.chunk.GeyserChunk;
+import org.geysermc.geyser.registry.BlockRegistries;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.util.MathUtils;
+import org.geysermc.mcprotocollib.protocol.data.game.chunk.DataPalette;
 
 public class ChunkCache {
     private final boolean cache;
@@ -45,13 +44,6 @@ public class ChunkCache {
     private int minY;
     @Setter
     private int heightY;
-
-    /**
-     * Which dimension Bedrock understands themselves to be in.
-     */
-    @Getter
-    @Setter
-    private BedrockDimension bedrockDimension = BedrockDimension.OVERWORLD;
 
     public ChunkCache(GeyserSession session) {
         this.cache = !session.getGeyser().getWorldManager().hasOwnChunkCache(); // To prevent Spigot from initializing
@@ -91,21 +83,26 @@ public class ChunkCache {
             return;
         }
 
-        DataPalette palette = chunk.sections()[(y - minY) >> 4];
-        if (palette == null) {
-            if (block != Block.JAVA_AIR_ID) {
-                // A previously empty chunk, which is no longer empty as a block has been added to it
-                palette = DataPalette.createForChunk();
-                // Fixes the chunk assuming that all blocks is the `block` variable we are updating. /shrug
-                palette.getPalette().stateToId(Block.JAVA_AIR_ID);
-                chunk.sections()[(y - minY) >> 4] = palette;
-            } else {
-                // Nothing to update
-                return;
+        boolean previouslyEmpty = false;
+        try {
+            DataPalette palette = chunk.sections()[(y - minY) >> 4];
+            if (palette == null) {
+                previouslyEmpty = true;
+                if (block != Block.JAVA_AIR_ID) {
+                    // A previously empty chunk, which is no longer empty as a block has been added to it
+                    palette = DataPalette.createForBlockState(Block.JAVA_AIR_ID, BlockRegistries.BLOCK_STATES.get().size());
+                    chunk.sections()[(y - minY) >> 4] = palette;
+                } else {
+                    // Nothing to update
+                    return;
+                }
             }
-        }
 
-        palette.set(x & 0xF, y & 0xF, z & 0xF, block);
+            palette.set(x & 0xF, y & 0xF, z & 0xF, block);
+        } catch (Throwable e) {
+            GeyserImpl.getInstance().getLogger().error("Failed to update block in chunk cache! ", e);
+            GeyserImpl.getInstance().getLogger().error("Info: newChunk=%s, block=%s, pos=%s,%s,%s".formatted(previouslyEmpty, block, x, y, z));
+        }
     }
 
     public int getBlockAt(int x, int y, int z) {

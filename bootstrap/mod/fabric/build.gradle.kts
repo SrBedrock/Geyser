@@ -1,5 +1,6 @@
 plugins {
-    application
+    id("geyser.modded-conventions")
+    id("geyser.modrinth-uploading-conventions")
 }
 
 architectury {
@@ -7,49 +8,41 @@ architectury {
     fabric()
 }
 
-val includeTransitive: Configuration = configurations.getByName("includeTransitive")
-
 dependencies {
     modImplementation(libs.fabric.loader)
     modApi(libs.fabric.api)
 
     api(project(":mod", configuration = "namedElements"))
-    shadow(project(path = ":mod", configuration = "transformProductionFabric")) {
-        isTransitive = false
-    }
-    shadow(projects.core) { isTransitive = false }
+    shadowBundle(project(path = ":mod", configuration = "transformProductionFabric"))
+    shadowBundle(projects.core)
     includeTransitive(projects.core)
 
     // These are NOT transitively included, and instead shadowed + relocated.
     // Avoids fabric complaining about non-SemVer versioning
-    shadow(libs.protocol.connection) { isTransitive = false }
-    shadow(libs.protocol.common) { isTransitive = false }
-    shadow(libs.protocol.codec) { isTransitive = false }
-    shadow(libs.mcauthlib) { isTransitive = false }
-    shadow(libs.raknet) { isTransitive = false }
-
-    // Consequences of shading + relocating mcauthlib: shadow/relocate mcpl!
-    shadow(libs.mcprotocollib) { isTransitive = false }
+    shadowBundle(libs.protocol.connection)
+    shadowBundle(libs.protocol.common)
+    shadowBundle(libs.protocol.codec)
+    shadowBundle(libs.raknet)
+    shadowBundle(libs.mcprotocollib)
 
     // Since we also relocate cloudburst protocol: shade erosion common
-    shadow(libs.erosion.common) { isTransitive = false }
+    shadowBundle(libs.erosion.common)
 
     // Let's shade in our own api/common module
-    shadow(projects.api) { isTransitive = false }
-    shadow(projects.common) { isTransitive = false }
+    shadowBundle(projects.api)
+    shadowBundle(projects.common)
 
-    // Permissions
-    modImplementation(libs.fabric.permissions)
-    include(libs.fabric.permissions)
+    modImplementation(libs.cloud.fabric)
+    include(libs.cloud.fabric)
+    include(libs.fabric.permissions.api)
 }
 
-application {
-    mainClass.set("org.geysermc.geyser.platform.fabric.GeyserFabricMain")
+tasks.withType<Jar> {
+    manifest.attributes["Main-Class"] = "org.geysermc.geyser.platform.fabric.GeyserFabricMain"
 }
 
 relocate("org.cloudburstmc.netty")
 relocate("org.cloudburstmc.protocol")
-relocate("com.github.steveice10.mc.auth")
 
 tasks {
     remapJar {

@@ -47,12 +47,12 @@ public class JavaAnimateTranslator extends PacketTranslator<ClientboundAnimatePa
 
     @Override
     public void translate(GeyserSession session, ClientboundAnimatePacket packet) {
-        Entity entity = session.getEntityCache().getEntityByJavaId(packet.getEntityId());
-        if (entity == null) {
-            return;
-        }
         Animation animation = packet.getAnimation();
         if (animation == null) {
+            return;
+        }
+        Entity entity = session.getEntityCache().getEntityByJavaId(packet.getEntityId());
+        if (entity == null) {
             return;
         }
 
@@ -92,7 +92,7 @@ public class JavaAnimateTranslator extends PacketTranslator<ClientboundAnimatePa
                 // Spawn custom particle
                 SpawnParticleEffectPacket stringPacket = new SpawnParticleEffectPacket();
                 stringPacket.setIdentifier("geyseropt:enchanted_hit_multiple");
-                stringPacket.setDimensionId(DimensionUtils.javaToBedrock(session.getDimension()));
+                stringPacket.setDimensionId(DimensionUtils.javaToBedrock(session));
                 stringPacket.setPosition(Vector3f.ZERO);
                 stringPacket.setUniqueEntityId(entity.getGeyserId());
                 stringPacket.setMolangVariablesJson(Optional.empty());

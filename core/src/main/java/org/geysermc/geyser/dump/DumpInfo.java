@@ -34,12 +34,12 @@ import com.google.common.io.Files;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.Getter;
-import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.geysermc.floodgate.util.DeviceOs;
 import org.geysermc.floodgate.util.FloodgateInfoHolder;
 import org.geysermc.geyser.GeyserImpl;
 import org.geysermc.geyser.api.GeyserApi;
 import org.geysermc.geyser.api.extension.Extension;
+import org.geysermc.geyser.api.util.MinecraftVersion;
 import org.geysermc.geyser.configuration.GeyserConfiguration;
 import org.geysermc.geyser.network.GameProtocol;
 import org.geysermc.geyser.session.GeyserSession;
@@ -55,6 +55,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -81,17 +82,17 @@ public class DumpInfo {
     private final FlagsInfo flagsInfo;
     private final List<ExtensionInfo> extensionInfo;
 
-    public DumpInfo(boolean addLog) {
+    public DumpInfo(GeyserImpl geyser, boolean addLog) {
         this.versionInfo = new VersionInfo();
 
         this.cpuCount = Runtime.getRuntime().availableProcessors();
         this.cpuName = CpuUtils.tryGetProcessorName();
         this.systemLocale = Locale.getDefault();
-        this.systemEncoding = System.getProperty("file.encoding");
+        this.systemEncoding = Charset.defaultCharset().displayName();
 
         this.gitInfo = new GitInfo(GeyserImpl.BUILD_NUMBER, GeyserImpl.COMMIT.substring(0, 7), GeyserImpl.COMMIT, GeyserImpl.BRANCH, GeyserImpl.REPOSITORY);
 
-        this.config = GeyserImpl.getInstance().getConfig();
+        this.config = geyser.getConfig();
         this.floodgate = new Floodgate();
 
         String md5Hash = "unknown";
@@ -107,7 +108,7 @@ public class DumpInfo {
             //noinspection UnstableApiUsage
             sha256Hash = byteSource.hash(Hashing.sha256()).toString();
         } catch (Exception e) {
-            if (GeyserImpl.getInstance().getConfig().isDebugMode()) {
+            if (this.config.isDebugMode()) {
                 e.printStackTrace();
             }
         }
@@ -116,18 +117,22 @@ public class DumpInfo {
         this.ramInfo = new RamInfo();
 
         if (addLog) {
-            this.logsInfo = new LogsInfo();
+            this.logsInfo = new LogsInfo(geyser);
         }
 
         this.userPlatforms = new Object2IntOpenHashMap<>();
-        for (GeyserSession session : GeyserImpl.getInstance().getSessionManager().getAllSessions()) {
+        for (GeyserSession session : geyser.getSessionManager().getAllSessions()) {
             DeviceOs device = session.getClientData().getDeviceOs();
             userPlatforms.put(device, userPlatforms.getOrDefault(device, 0) + 1);
         }
 
-        this.connectionAttempts = GeyserImpl.getInstance().getGeyserServer().getConnectionAttempts();
+        if (geyser.getGeyserServer() != null) {
+            this.connectionAttempts = geyser.getGeyserServer().getConnectionAttempts();
+        } else {
+            this.connectionAttempts = 0; // Fallback if Geyser failed to fully startup
+        }
 
-        this.bootstrapInfo = GeyserImpl.getInstance().getBootstrap().getDumpInfo();
+        this.bootstrapInfo = geyser.getBootstrap().getDumpInfo();
 
         this.flagsInfo = new FlagsInfo();
 
@@ -174,9 +179,8 @@ public class DumpInfo {
 
         NetworkInfo() {
             if (AsteriskSerializer.showSensitive) {
-                try {
+                try (Socket socket = new Socket()) {
                     // This is the most reliable for getting the main local IP
-                    Socket socket = new Socket();
                     socket.connect(new InetSocketAddress("geysermc.org", 80));
                     this.internalIP = socket.getLocalAddress().getHostAddress();
                 } catch (IOException e1) {
@@ -221,9 +225,9 @@ public class DumpInfo {
         private final int javaProtocol;
 
         MCInfo() {
-            this.bedrockVersions = GameProtocol.SUPPORTED_BEDROCK_CODECS.stream().map(BedrockCodec::getMinecraftVersion).toList();
-            this.bedrockProtocols = GameProtocol.SUPPORTED_BEDROCK_CODECS.stream().map(BedrockCodec::getProtocolVersion).toList();
-            this.defaultBedrockProtocol = GameProtocol.DEFAULT_BEDROCK_CODEC.getProtocolVersion();
+            this.bedrockVersions = GameProtocol.SUPPORTED_BEDROCK_VERSIONS.stream().map(MinecraftVersion::versionString).toList();
+            this.bedrockProtocols = GameProtocol.SUPPORTED_BEDROCK_PROTOCOLS;
+            this.defaultBedrockProtocol = GameProtocol.DEFAULT_BEDROCK_PROTOCOL;
             this.javaVersions = GameProtocol.getJavaVersions();
             this.javaProtocol = GameProtocol.getJavaProtocolVersion();
         }
@@ -244,10 +248,10 @@ public class DumpInfo {
     public static class LogsInfo {
         private String link;
 
-        public LogsInfo() {
+        public LogsInfo(GeyserImpl geyser) {
             try {
                 Map<String, String> fields = new HashMap<>();
-                fields.put("content", FileUtils.readAllLines(GeyserImpl.getInstance().getBootstrap().getLogsPath()).collect(Collectors.joining("\n")));
+                fields.put("content", FileUtils.readAllLines(geyser.getBootstrap().getLogsPath()).collect(Collectors.joining("\n")));
 
                 JsonNode logData = GeyserImpl.JSON_MAPPER.readTree(WebUtils.postForm("https://api.mclo.gs/1/log", fields));
 

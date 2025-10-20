@@ -25,41 +25,30 @@
 
 package org.geysermc.geyser.platform.mod.world;
 
-import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BannerBlockEntity;
-import net.minecraft.world.level.block.entity.BannerPatternLayers;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.DecoratedPotBlockEntity;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import org.checkerframework.checker.nullness.qual.NonNull;
+import org.cloudburstmc.math.vector.Vector3i;
 import org.geysermc.geyser.level.GeyserWorldManager;
 import org.geysermc.geyser.network.GameProtocol;
-import org.geysermc.geyser.platform.mod.GeyserModBootstrap;
 import org.geysermc.geyser.session.GeyserSession;
-import org.geysermc.geyser.util.MinecraftKey;
-import org.geysermc.mcprotocollib.protocol.data.game.Holder;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
-import org.geysermc.mcprotocollib.protocol.data.game.item.component.BannerPatternLayer;
-import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class GeyserModWorldManager extends GeyserWorldManager {
 
-    private static final GsonComponentSerializer GSON_SERIALIZER = GsonComponentSerializer.gson();
     private final MinecraftServer server;
 
     public GeyserModWorldManager(MinecraftServer server) {
@@ -71,7 +60,7 @@ public class GeyserModWorldManager extends GeyserWorldManager {
         // If the protocol version of Geyser and the server are not the
         // same, fallback to the chunk cache. May be able to update this
         // in the future to use ViaVersion however, like Spigot does.
-        if (SharedConstants.getCurrentVersion().getProtocolVersion() != GameProtocol.getJavaProtocolVersion()) {
+        if (SharedConstants.getCurrentVersion().protocolVersion() != GameProtocol.getJavaProtocolVersion()) {
             return super.getBlockAt(session, x, y, z);
         }
 
@@ -81,16 +70,17 @@ public class GeyserModWorldManager extends GeyserWorldManager {
         }
 
         Level level = player.level();
-        if (y < level.getMinBuildHeight()) {
+        if (y < level.getMinY()) {
             return 0;
         }
 
-        ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.FULL, false);
+        // Only loads active chunks, and doesn't delegate to main thread
+        ChunkAccess chunk = ((ServerChunkCache) level.getChunkSource()).chunkMap.getChunkToSend(ChunkPos.asLong(x >> 4, z >> 4));
         if (chunk == null) {
             return 0;
         }
 
-        int worldOffset = level.getMinBuildHeight() >> 4;
+        int worldOffset = level.getMinY() >> 4;
         int chunkOffset = (y >> 4) - worldOffset;
         if (chunkOffset < chunk.getSections().length) {
             LevelChunkSection section = chunk.getSections()[chunkOffset];
@@ -104,13 +94,7 @@ public class GeyserModWorldManager extends GeyserWorldManager {
 
     @Override
     public boolean hasOwnChunkCache() {
-        return SharedConstants.getCurrentVersion().getProtocolVersion() == GameProtocol.getJavaProtocolVersion();
-    }
-
-    @Override
-    public boolean hasPermission(GeyserSession session, String permission) {
-        ServerPlayer player = getPlayer(session);
-        return GeyserModBootstrap.getInstance().hasPermission(player, permission);
+        return SharedConstants.getCurrentVersion().protocolVersion() == GameProtocol.getJavaProtocolVersion();
     }
 
     @Override
@@ -118,66 +102,28 @@ public class GeyserModWorldManager extends GeyserWorldManager {
         return GameMode.byId(server.getDefaultGameType().getId());
     }
 
-    @NonNull
     @Override
-    public CompletableFuture<org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents> getPickItemComponents(GeyserSession session, int x, int y, int z, boolean addNbtData) {
-        CompletableFuture<org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents> future = new CompletableFuture<>();
+    public void getDecoratedPotData(GeyserSession session, Vector3i pos, Consumer<List<String>> apply) {
         server.execute(() -> {
             ServerPlayer player = getPlayer(session);
             if (player == null) {
-                future.complete(null);
                 return;
             }
 
-            BlockPos pos = new BlockPos(x, y, z);
+            BlockPos blockPos = new BlockPos(pos.getX(), pos.getY(), pos.getZ());
             // Don't create a new block entity if invalid
             //noinspection resource - level() is just a getter
-            BlockEntity blockEntity = player.level().getChunkAt(pos).getBlockEntity(pos);
-            if (blockEntity instanceof BannerBlockEntity banner) {
-                // Potentially exposes other NBT data? But we need to get the NBT data for the banner patterns *and*
-                // the banner might have a custom name, both of which a Java client knows and caches
-                ItemStack itemStack = banner.getItem();
-
-                org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents components =
-                        new org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents(new HashMap<>());
-
-                components.put(DataComponentType.DAMAGE, itemStack.getDamageValue());
-
-                Component customName = itemStack.getComponents().get(DataComponents.CUSTOM_NAME);
-                if (customName != null) {
-                    components.put(DataComponentType.CUSTOM_NAME, toKyoriComponent(customName));
-                }
-
-                BannerPatternLayers pattern = itemStack.get(DataComponents.BANNER_PATTERNS);
-                if (pattern != null) {
-                    components.put(DataComponentType.BANNER_PATTERNS, toPatternList(pattern));
-                }
-
-                future.complete(components);
-                return;
+            BlockEntity blockEntity = player.level().getChunkAt(blockPos).getBlockEntity(blockPos);
+            if (blockEntity instanceof DecoratedPotBlockEntity pot) {
+                List<String> sherds = pot.getDecorations().ordered()
+                        .stream().map(item -> BuiltInRegistries.ITEM.getKey(item).toString())
+                        .toList();
+                apply.accept(sherds);
             }
-            future.complete(null);
         });
-        return future;
     }
 
     private ServerPlayer getPlayer(GeyserSession session) {
         return server.getPlayerList().getPlayer(session.getPlayerEntity().getUuid());
-    }
-
-    private static net.kyori.adventure.text.Component toKyoriComponent(Component component) {
-        String json = Component.Serializer.toJson(component, RegistryAccess.EMPTY);
-        return GSON_SERIALIZER.deserializeOr(json, net.kyori.adventure.text.Component.empty());
-    }
-
-    private static List<BannerPatternLayer> toPatternList(BannerPatternLayers patternLayers) {
-        return patternLayers.layers().stream()
-                .map(layer -> {
-                    BannerPatternLayer.BannerPattern pattern = new BannerPatternLayer.BannerPattern(
-                            MinecraftKey.key(layer.pattern().value().assetId().toString()), layer.pattern().value().translationKey()
-                    );
-                    return new BannerPatternLayer(Holder.ofCustom(pattern), layer.color().getId());
-                })
-                .toList();
     }
 }

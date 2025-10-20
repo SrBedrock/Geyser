@@ -1,17 +1,20 @@
 plugins {
-    application
+    id("geyser.modded-conventions")
+    id("geyser.modrinth-uploading-conventions")
 }
-
-// This is provided by "org.cloudburstmc.math.mutable" too, so yeet.
-// NeoForge's class loader is *really* annoying.
-provided("org.cloudburstmc.math", "api")
 
 architectury {
     platformSetupLoomIde()
     neoForge()
 }
 
-val includeTransitive: Configuration = configurations.getByName("includeTransitive")
+// This is provided by "org.cloudburstmc.math.mutable" too, so yeet.
+// NeoForge's class loader is *really* annoying.
+provided("org.cloudburstmc.math", "api")
+provided("com.google.errorprone", "error_prone_annotations")
+
+// Jackson shipped by Minecraft is too old, so we shade & relocate our newer version
+relocate("com.fasterxml.jackson")
 
 dependencies {
     // See https://github.com/google/guava/issues/6618
@@ -24,23 +27,30 @@ dependencies {
     neoForge(libs.neoforge.minecraft)
 
     api(project(":mod", configuration = "namedElements"))
-    shadow(project(path = ":mod", configuration = "transformProductionNeoForge")) {
-        isTransitive = false
-    }
-    shadow(projects.core) { isTransitive = false }
+    shadowBundle(project(path = ":mod", configuration = "transformProductionNeoForge"))
+    shadowBundle(projects.core)
+
+    // Minecraft (1.21.2+) includes jackson. But an old version!
+    shadowBundle(libs.jackson.core)
+    shadowBundle(libs.jackson.databind)
+    shadowBundle(libs.jackson.dataformat.yaml)
+    shadowBundle(libs.jackson.annotations)
 
     // Let's shade in our own api
-    shadow(projects.api) { isTransitive = false }
+    shadowBundle(projects.api)
 
     // cannot be shaded, since neoforge will complain if floodgate-neoforge tries to provide this
     include(projects.common)
 
     // Include all transitive deps of core via JiJ
     includeTransitive(projects.core)
+
+    modImplementation(libs.cloud.neoforge)
+    include(libs.cloud.neoforge)
 }
 
-application {
-    mainClass.set("org.geysermc.geyser.platform.forge.GeyserNeoForgeMain")
+tasks.withType<Jar> {
+    manifest.attributes["Main-Class"] = "org.geysermc.geyser.platform.neoforge.GeyserNeoForgeMain"
 }
 
 tasks {
@@ -50,6 +60,11 @@ tasks {
 
     remapModrinthJar {
         archiveBaseName.set("geyser-neoforge")
+    }
+
+    shadowJar {
+        // Without this, jackson's service files are not relocated
+        mergeServiceFiles()
     }
 }
 

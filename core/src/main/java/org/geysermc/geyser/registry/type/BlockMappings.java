@@ -26,6 +26,7 @@
 package org.geysermc.geyser.registry.type;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import lombok.Builder;
 import lombok.Value;
@@ -44,7 +45,7 @@ import java.util.Set;
 
 @Builder
 @Value
-public class BlockMappings implements DefinitionRegistry<GeyserBedrockBlock> {
+public class BlockMappings implements DefinitionRegistry<BlockDefinition> {
     GeyserBedrockBlock bedrockAir;
     BlockDefinition bedrockWater;
     BlockDefinition bedrockMovingBlock;
@@ -64,6 +65,9 @@ public class BlockMappings implements DefinitionRegistry<GeyserBedrockBlock> {
 
     BlockDefinition commandBlock;
     BlockDefinition mobSpawnerBlock;
+    BlockDefinition netherPortalBlock;
+
+    IntArrayList collisionIgnoredBlocks;
 
     Map<NbtMap, BlockDefinition> itemFrames;
     Map<Block, NbtMap> flowerPotBlocks;
@@ -134,7 +138,7 @@ public class BlockMappings implements DefinitionRegistry<GeyserBedrockBlock> {
     }
 
     @Override
-    public boolean isRegistered(GeyserBedrockBlock bedrockBlock) {
+    public boolean isRegistered(BlockDefinition bedrockBlock) {
         return getDefinition(bedrockBlock.getRuntimeId()) == bedrockBlock;
     }
 }

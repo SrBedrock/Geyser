@@ -34,8 +34,10 @@ import org.geysermc.geyser.entity.EntityDefinition;
 import org.geysermc.geyser.inventory.GeyserItemStack;
 import org.geysermc.geyser.item.Items;
 import org.geysermc.geyser.item.type.DyeItem;
+import org.geysermc.geyser.item.type.Item;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.tags.ItemTag;
+import org.geysermc.geyser.session.cache.tags.Tag;
 import org.geysermc.geyser.util.InteractionResult;
 import org.geysermc.geyser.util.InteractiveTag;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
@@ -59,14 +61,14 @@ public class SheepEntity extends AnimalEntity {
 
     @Override
     @Nullable
-    protected ItemTag getFoodTag() {
+    protected Tag<Item> getFoodTag() {
         return ItemTag.SHEEP_FOOD;
     }
 
     @NonNull
     @Override
     protected InteractiveTag testMobInteraction(@NonNull Hand hand, @NonNull GeyserItemStack itemInHand) {
-        if (itemInHand.asItem() == Items.SHEARS) {
+        if (itemInHand.is(Items.SHEARS)) {
             return InteractiveTag.SHEAR;
         } else {
             InteractiveTag tag = super.testMobInteraction(hand, itemInHand);
@@ -84,7 +86,7 @@ public class SheepEntity extends AnimalEntity {
     @NonNull
     @Override
     protected InteractionResult mobInteract(@NonNull Hand hand, @NonNull GeyserItemStack itemInHand) {
-        if (itemInHand.asItem() == Items.SHEARS) {
+        if (itemInHand.is(Items.SHEARS)) {
             return InteractionResult.CONSUME;
         } else {
             InteractionResult superResult = super.mobInteract(hand, itemInHand);

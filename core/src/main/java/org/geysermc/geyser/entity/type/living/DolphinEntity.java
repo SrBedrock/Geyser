@@ -37,7 +37,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 
 import java.util.UUID;
 
-public class DolphinEntity extends WaterEntity {
+public class DolphinEntity extends AgeableWaterEntity {
     public DolphinEntity(GeyserSession session, int entityId, long geyserId, UUID uuid, EntityDefinition<?> definition, Vector3f position, Vector3f motion, float yaw, float pitch, float headYaw) {
         super(session, entityId, geyserId, uuid, definition, position, motion, yaw, pitch, headYaw);
     }
@@ -50,7 +50,7 @@ public class DolphinEntity extends WaterEntity {
     @NonNull
     @Override
     protected InteractiveTag testMobInteraction(@NonNull Hand hand, @NonNull GeyserItemStack itemInHand) {
-        if (!itemInHand.isEmpty() && session.getTagCache().is(ItemTag.FISHES, itemInHand)) {
+        if (!itemInHand.isEmpty() && itemInHand.is(session, ItemTag.FISHES)) {
             return InteractiveTag.FEED;
         }
         return super.testMobInteraction(hand, itemInHand);
@@ -59,7 +59,7 @@ public class DolphinEntity extends WaterEntity {
     @NonNull
     @Override
     protected InteractionResult mobInteract(@NonNull Hand hand, @NonNull GeyserItemStack itemInHand) {
-        if (!itemInHand.isEmpty() && session.getTagCache().is(ItemTag.FISHES, itemInHand)) {
+        if (!itemInHand.isEmpty() && itemInHand.is(session, ItemTag.FISHES)) {
             // Feed
             return InteractionResult.SUCCESS;
         }

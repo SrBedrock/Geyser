@@ -34,8 +34,10 @@ import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 import org.cloudburstmc.protocol.bedrock.packet.EntityEventPacket;
 import org.geysermc.geyser.entity.EntityDefinition;
 import org.geysermc.geyser.inventory.GeyserItemStack;
+import org.geysermc.geyser.item.type.Item;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.tags.ItemTag;
+import org.geysermc.geyser.session.cache.tags.Tag;
 import org.geysermc.geyser.util.InteractionResult;
 import org.geysermc.geyser.util.InteractiveTag;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
@@ -62,7 +64,7 @@ public class PandaEntity extends AnimalEntity {
             packet.setRuntimeEntityId(geyserId);
             packet.setType(EntityEventType.EATING_ITEM);
             // As of 1.20.5 - pandas can eat cake
-            packet.setData(this.hand.getDefinition().getRuntimeId() << 16);
+            packet.setData(session.getItemMappings().getMapping(getMainHandItem()).getBedrockDefinition().getRuntimeId() << 16);
             session.sendUpstreamPacket(packet);
         }
     }
@@ -90,7 +92,7 @@ public class PandaEntity extends AnimalEntity {
 
     @Override
     @Nullable
-    protected ItemTag getFoodTag() {
+    protected Tag<Item> getFoodTag() {
         return ItemTag.PANDA_FOOD;
     }
 

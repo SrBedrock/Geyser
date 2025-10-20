@@ -43,6 +43,7 @@ import org.geysermc.geyser.registry.BlockRegistries;
 import org.geysermc.geyser.registry.type.CustomSkull;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.skin.SkinManager;
+import org.geysermc.mcprotocollib.auth.GameProfile;
 
 import java.io.IOException;
 import java.util.*;
@@ -50,27 +51,19 @@ import java.util.*;
 public class SkullCache {
     private final int maxVisibleSkulls;
     private final boolean cullingEnabled;
-    
+
     private final int skullRenderDistanceSquared;
-    
-    /**
-     * The time in milliseconds before unused skull entities are despawned
-     */
-    private static final long CLEANUP_PERIOD = 10000;
 
     @Getter
     private final Map<Vector3i, Skull> skulls = new Object2ObjectOpenHashMap<>();
 
     private final List<Skull> inRangeSkulls = new ArrayList<>();
 
-    private final Deque<SkullPlayerEntity> unusedSkullEntities = new ArrayDeque<>();
     private int totalSkullEntities = 0;
 
     private final GeyserSession session;
 
     private Vector3f lastPlayerPosition;
-
-    private long lastCleanup = System.currentTimeMillis();
 
     public SkullCache(GeyserSession session) {
         this.session = session;
@@ -80,6 +73,14 @@ public class SkullCache {
         // Normal skulls are not rendered beyond 64 blocks
         int distance = Math.min(session.getGeyser().getConfig().getCustomSkullRenderDistance(), 64);
         this.skullRenderDistanceSquared = distance * distance;
+    }
+
+    public Skull putSkull(Vector3i position, GameProfile resolved, BlockState blockState) {
+        GameProfile.Property textures = resolved.getProperty("textures");
+        if (textures != null) {
+            return putSkull(position, resolved.getId(), textures.getValue(), blockState);
+        }
+        return null;
     }
 
     public Skull putSkull(Vector3i position, UUID uuid, String texturesProperty, BlockState blockState) {
@@ -188,43 +189,26 @@ public class SkullCache {
                 }
             }
         }
-
-        // Occasionally clean up unused entities as we want to keep skull
-        // entities around for later use, to reduce "player" pop-in
-        if ((System.currentTimeMillis() - lastCleanup) > CLEANUP_PERIOD) {
-            lastCleanup = System.currentTimeMillis();
-            for (SkullPlayerEntity entity : unusedSkullEntities) {
-                entity.despawnEntity();
-                totalSkullEntities--;
-            }
-            unusedSkullEntities.clear();
-        }
     }
 
     private void assignSkullEntity(Skull skull) {
         if (skull.entity != null) {
             return;
         }
-        if (unusedSkullEntities.isEmpty()) {
-            if (!cullingEnabled || totalSkullEntities < maxVisibleSkulls) {
-                // Create a new entity
-                long geyserId = session.getEntityCache().getNextEntityId().incrementAndGet();
-                skull.entity = new SkullPlayerEntity(session, geyserId);
-                skull.entity.spawnEntity();
-                skull.entity.updateSkull(skull);
-                totalSkullEntities++;
-            }
-        } else {
-            // Reuse an entity
-            skull.entity = unusedSkullEntities.removeFirst();
+        if (!cullingEnabled || totalSkullEntities < maxVisibleSkulls) {
+            // Create a new entity
+            long geyserId = session.getEntityCache().getNextEntityId().incrementAndGet();
+            skull.entity = new SkullPlayerEntity(session, geyserId);
+            skull.entity.spawnEntity();
             skull.entity.updateSkull(skull);
+            totalSkullEntities++;
         }
     }
 
     private void freeSkullEntity(Skull skull) {
         if (skull.entity != null) {
-            skull.entity.free();
-            unusedSkullEntities.addFirst(skull.entity);
+            skull.entity.despawnEntity();
+            totalSkullEntities--;
             skull.entity = null;
         }
     }
@@ -243,9 +227,13 @@ public class SkullCache {
     }
 
     public void clear() {
+        for (Skull skull : skulls.values()) {
+            if (skull.entity != null) {
+                skull.entity.despawnEntity();
+            }
+        }
         skulls.clear();
         inRangeSkulls.clear();
-        unusedSkullEntities.clear();
         totalSkullEntities = 0;
         lastPlayerPosition = null;
     }

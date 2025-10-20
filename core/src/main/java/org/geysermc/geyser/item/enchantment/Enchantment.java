@@ -28,44 +28,44 @@ package org.geysermc.geyser.item.enchantment;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.cloudburstmc.nbt.NbtMap;
 import org.geysermc.geyser.inventory.item.BedrockEnchantment;
-import org.geysermc.geyser.session.cache.tags.EnchantmentTag;
-import org.geysermc.geyser.session.cache.tags.ItemTag;
+import org.geysermc.geyser.item.type.Item;
+import org.geysermc.geyser.session.cache.registry.JavaRegistries;
+import org.geysermc.geyser.session.cache.registry.RegistryEntryContext;
+import org.geysermc.geyser.session.cache.tags.GeyserHolderSet;
 import org.geysermc.geyser.translator.text.MessageTranslator;
-import org.geysermc.geyser.util.MinecraftKey;
-import org.geysermc.mcprotocollib.protocol.data.game.RegistryEntry;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * @param description only populated if {@link #bedrockEnchantment()} is not null.
+ * @param description only populated if {@link #bedrockEnchantment()} is null.
  * @param anvilCost also as a rarity multiplier
  */
-public record Enchantment(String identifier,
-                          Set<EnchantmentComponent> effects,
-                          ItemTag supportedItems,
+public record Enchantment(Set<EnchantmentComponent> effects,
+                          GeyserHolderSet<Item> supportedItems,
                           int maxLevel,
                           String description,
                           int anvilCost,
-                          @Nullable EnchantmentTag exclusiveSet,
+                          GeyserHolderSet<Enchantment> exclusiveSet,
                           @Nullable BedrockEnchantment bedrockEnchantment) {
 
-    // Implementation note: I have a feeling the tags can be a list of items, because in vanilla they're HolderSet classes.
-    // I'm not sure how that's wired over the network, so we'll put it off.
-    public static Enchantment read(RegistryEntry entry) {
-        NbtMap data = entry.getData();
+    public static Enchantment read(RegistryEntryContext context) {
+        NbtMap data = context.data();
         Set<EnchantmentComponent> effects = readEnchantmentComponents(data.getCompound("effects"));
-        String supportedItems = data.getString("supported_items").substring(1); // Remove '#' at beginning that indicates tag
+
+        GeyserHolderSet<Item> supportedItems = GeyserHolderSet.readHolderSet(context.session(), JavaRegistries.ITEM, data.get("supported_items"));
+
         int maxLevel = data.getInt("max_level");
         int anvilCost = data.getInt("anvil_cost");
-        String exclusiveSet = data.getString("exclusive_set", null);
-        EnchantmentTag exclusiveSetTag = exclusiveSet == null ? null : EnchantmentTag.ALL_ENCHANTMENT_TAGS.get(MinecraftKey.key(exclusiveSet.substring(1)));
-        BedrockEnchantment bedrockEnchantment = BedrockEnchantment.getByJavaIdentifier(entry.getId().asString());
-        String description = bedrockEnchantment == null ? MessageTranslator.deserializeDescription(data) : null;
 
-        return new Enchantment(entry.getId().asString(), effects, ItemTag.ALL_ITEM_TAGS.get(MinecraftKey.key(supportedItems)), maxLevel,
-                description, anvilCost, exclusiveSetTag, bedrockEnchantment);
+        GeyserHolderSet<Enchantment> exclusiveSet = GeyserHolderSet.readHolderSet(JavaRegistries.ENCHANTMENT, data.get("exclusive_set"), context::getNetworkId);
+
+        BedrockEnchantment bedrockEnchantment = BedrockEnchantment.getByJavaIdentifier(context.id().asString());
+
+        String description = bedrockEnchantment == null ? MessageTranslator.deserializeDescription(context.session(), data) : null;
+
+        return new Enchantment(effects, supportedItems, maxLevel, description, anvilCost, exclusiveSet, bedrockEnchantment);
     }
 
     private static Set<EnchantmentComponent> readEnchantmentComponents(NbtMap effects) {

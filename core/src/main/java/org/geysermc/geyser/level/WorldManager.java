@@ -38,14 +38,16 @@ import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponent;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents;
-import org.geysermc.mcprotocollib.protocol.data.game.item.component.ItemCodecHelper;
 import org.geysermc.mcprotocollib.protocol.data.game.setting.Difficulty;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -124,7 +126,7 @@ public abstract class WorldManager {
      * @param value The new value for the gamerule
      */
     public void setGameRule(GeyserSession session, String name, Object value) {
-        session.sendCommand("gamerule " + name + " " + value);
+        session.sendCommandPacket("gamerule " + name + " " + value);
     }
 
     /**
@@ -146,16 +148,6 @@ public abstract class WorldManager {
     public abstract int getGameRuleInt(GeyserSession session, GameRule gameRule);
 
     /**
-     * Change the game mode of the given session
-     *
-     * @param session The session of the player to change the game mode of
-     * @param gameMode The game mode to change the player to
-     */
-    public void setPlayerGameMode(GeyserSession session, GameMode gameMode) {
-        session.sendCommand("gamemode " + gameMode.name().toLowerCase(Locale.ROOT));
-    }
-
-    /**
      * Get the default game mode of the server
      *
      * @param session the player requesting the default game mode
@@ -170,7 +162,7 @@ public abstract class WorldManager {
      * @param gameMode the new default game mode
      */
     public void setDefaultGameMode(GeyserSession session, GameMode gameMode) {
-        session.sendCommand("defaultgamemode " + gameMode.name().toLowerCase(Locale.ROOT));
+        session.sendCommandPacket("defaultgamemode " + gameMode.name().toLowerCase(Locale.ROOT));
     }
 
     /**
@@ -180,17 +172,8 @@ public abstract class WorldManager {
      * @param difficulty The difficulty to change to
      */
     public void setDifficulty(GeyserSession session, Difficulty difficulty) {
-        session.sendCommand("difficulty " + difficulty.name().toLowerCase(Locale.ROOT));
+        session.sendCommandPacket("difficulty " + difficulty.name().toLowerCase(Locale.ROOT));
     }
-
-    /**
-     * Checks if the given session's player has a permission
-     *
-     * @param session The session of the player to check the permission of
-     * @param permission The permission node to check
-     * @return True if the player has the requested permission, false if not
-     */
-    public abstract boolean hasPermission(GeyserSession session, String permission);
 
     /**
      * Returns a list of biome identifiers available on the server.
@@ -200,22 +183,19 @@ public abstract class WorldManager {
     }
 
     /**
-     * Used for pick block, so we don't need to cache more data than necessary.
-     *
-     * @return expected NBT for this item.
+     * Retrieves decorated pot sherds from the server. Used to ensure the data is not erased on animation sent
+     * through the BlockEntityDataPacket.
      */
-    @NonNull
-    public CompletableFuture<@Nullable DataComponents> getPickItemComponents(GeyserSession session, int x, int y, int z, boolean addExtraData) {
-        return CompletableFuture.completedFuture(null);
+    public void getDecoratedPotData(GeyserSession session, Vector3i pos, Consumer<List<String>> apply) {
     }
 
     protected static final Function<Int2ObjectMap<byte[]>, DataComponents> RAW_TRANSFORMER = map -> {
         try {
             Map<DataComponentType<?>, DataComponent<?, ?>> components = new HashMap<>();
             Int2ObjectMaps.fastForEach(map, entry -> {
-                DataComponentType type = DataComponentType.from(entry.getIntKey());
+                DataComponentType<?> type = DataComponentTypes.from(entry.getIntKey());
                 ByteBuf buf = Unpooled.wrappedBuffer(entry.getValue());
-                DataComponent value = type.readDataComponent(ItemCodecHelper.INSTANCE, buf);
+                DataComponent<?, ?> value = type.readDataComponent(buf);
                 components.put(type, value);
             });
             return new DataComponents(components);

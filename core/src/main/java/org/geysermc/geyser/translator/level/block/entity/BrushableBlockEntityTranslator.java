@@ -37,7 +37,6 @@ import org.geysermc.mcprotocollib.protocol.data.game.level.block.BlockEntityType
 
 @BlockEntity(type = BlockEntityType.BRUSHABLE_BLOCK)
 public class BrushableBlockEntityTranslator extends BlockEntityTranslator implements RequiresBlockState {
-
     @Override
     public void translateTag(GeyserSession session, NbtMapBuilder bedrockNbt, @Nullable NbtMap javaNbt, BlockState blockState) {
         if (javaNbt == null) {
@@ -65,7 +64,7 @@ public class BrushableBlockEntityTranslator extends BlockEntityTranslator implem
         }
         NbtMapBuilder itemBuilder = NbtMap.builder()
             .putString("Name", mapping.getBedrockIdentifier())
-            .putByte("Count", (byte) itemTag.getByte("Count"));
+            .putByte("Count", itemTag.getByte("Count"));
 
         bedrockNbt.putCompound("item", itemBuilder.build());
         // controls which side the item protrudes from
